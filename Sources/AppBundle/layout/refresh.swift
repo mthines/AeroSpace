@@ -125,8 +125,12 @@ private func refresh() async throws {
     let mapping = try await MacApp.refreshAllAndGetAliveWindowIds(frontmostAppBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
     let aliveWindowIds = mapping.values.flatMap(id).toSet()
 
+    var didCloseOverviewWindow = false
     for window in MacWindow.allWindows {
         if !aliveWindowIds.contains(window.windowId) {
+            if isOverviewActive && OverviewManager.shared.isWindowInOverview(window.windowId) {
+                didCloseOverviewWindow = true
+            }
             window.garbageCollect(skipClosedWindowsCache: false)
         }
     }
@@ -138,6 +142,10 @@ private func refresh() async throws {
 
     // Garbage collect workspaces after apps, because workspaces contain apps.
     Workspace.garbageCollectUnusedWorkspaces()
+
+    if didCloseOverviewWindow {
+        Task { @MainActor in try? await OverviewManager.shared.refreshLayout() }
+    }
 }
 
 func refreshObs(_: AXObserver, _: AXUIElement, notif: CFString, _: UnsafeMutableRawPointer?) {
@@ -154,6 +162,15 @@ enum OptimalHideCorner {
 
 @MainActor
 private func layoutWorkspaces() async throws {
+    // While the overview is open, OverviewManager owns every window's physical frame
+    // — route layout changes through refreshLayout instead of letting the normal pass
+    // re-hide our cell-positioned windows in the corner.
+    if isOverviewActive {
+        if !OverviewManager.shared.isClosing && !OverviewManager.shared.isRefreshing {
+            Task { @MainActor in try? await OverviewManager.shared.refreshLayout() }
+        }
+        return
+    }
     if !TrayMenuModel.shared.isEnabled {
         for workspace in Workspace.all {
             workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!

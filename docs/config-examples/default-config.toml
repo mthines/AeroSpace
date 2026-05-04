@@ -79,6 +79,24 @@ on-mode-changed = []
     outer.top =        0
     outer.right =      0
 
+# Mission-Control-style workspace overview.
+# See: https://nikitabobko.github.io/AeroSpace/commands#overview
+[overview]
+    # Limit which workspaces appear in the grid. Mutually exclusive with 'exclude-workspaces'.
+    # Drop both to show every non-empty workspace.
+    # workspaces = ['1', '2', '3']
+    # exclude-workspaces = ['9']
+
+    # Grid column count: 'auto' (Mission-Control-like) or a positive integer.
+    columns = 'auto'
+
+    # Cell label content: 'workspace-name' | 'app-list' | 'both'.
+    cell-label = 'workspace-name'
+
+    # Dim the area behind the repositioned windows.
+    dim-background = true
+    dim-opacity = 70  # integer 0..100 (percent)
+
 # 'main' binding mode declaration
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
 # 'main' binding mode must be always presented
@@ -202,6 +220,13 @@ on-mode-changed = []
     alt-tab = 'workspace-back-and-forth'
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-workspace-to-monitor
     alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
+
+    # See: https://nikitabobko.github.io/AeroSpace/commands#overview
+    # alt-grave = 'overview'
+    # ctrl-alt-left = 'workspace prev'
+    # ctrl-alt-right = 'workspace next'
+    # ctrl-alt-up = 'workspace up'      # overview-only grid jump
+    # ctrl-alt-down = 'workspace down'  # overview-only grid jump
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#mode
     alt-shift-semicolon = 'mode service'

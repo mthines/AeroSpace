@@ -9,6 +9,7 @@
 /default.profraw
 .DS_Store
 /.xcode-build
+/.xcode-build-debug
 # Swift package manager
 /.build
 /.swiftpm

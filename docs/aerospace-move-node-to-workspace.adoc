@@ -12,6 +12,8 @@ include::util/man-attributes.adoc[]
 aerospace move-node-to-workspace [-h|--help] [--focus-follows-window] [--wrap-around]
                                  [--stdin|--no-stdin]
                                  (next|prev)
+aerospace move-node-to-workspace [-h|--help] [--focus-follows-window]
+                                 (left|right|up|down)
 aerospace move-node-to-workspace [-h|--help] [--focus-follows-window] [--fail-if-noop]
                                  [--window-id <window-id>] <workspace-name>
 
@@ -23,7 +25,10 @@ aerospace move-node-to-workspace [-h|--help] [--focus-follows-window] [--fail-if
 // tag::body[]
 {manpurpose}
 
-`(next|prev)` is identical to `workspace (next|prev)`
+`(next|prev)` is identical to `workspace (next|prev)`.
+
+`(left|right|up|down)` is identical to `workspace (left|right|up|down)` —
+overview-only grid direction; outside the overview the command is a silent no-op.
 
 // =========================================================== Options
 include::./util/conditional-options-header.adoc[]

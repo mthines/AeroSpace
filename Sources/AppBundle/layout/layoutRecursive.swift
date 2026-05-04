@@ -2,40 +2,48 @@ import AppKit
 
 extension Workspace {
     @MainActor
-    func layoutWorkspace() async throws {
+    func layoutWorkspace(dryRun: Bool = false) async throws {
         if isEffectivelyEmpty { return }
         let rect = workspaceMonitor.visibleRectPaddedByOuterGaps
         // If monitors are aligned vertically and the monitor below has smaller width, then macOS may not allow the
         // window on the upper monitor to take full width. rect.height - 1 resolves this problem
         // But I also faced this problem in monitors horizontal configuration. ¯\_(ツ)_/¯
-        try await layoutRecursive(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, LayoutContext(self))
+        try await layoutRecursive(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, LayoutContext(self), dryRun: dryRun)
     }
 }
 
 extension TreeNode {
+    /// Lays out the tree. When `dryRun` is true, computes and stores
+    /// `lastAppliedLayoutPhysicalRect` (and normalizes container child weights) without
+    /// invoking any AX `setAxFrame` calls. The overview uses this to refresh stale tree
+    /// state for inactive workspaces (e.g. weights left over after a node was moved out)
+    /// while keeping the corner-hidden windows visually in place.
     @MainActor
-    fileprivate func layoutRecursive(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
+    fileprivate func layoutRecursive(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext, dryRun: Bool = false) async throws {
+        if isOverviewActive && !dryRun { return }
         let physicalRect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         switch nodeCases {
             case .workspace(let workspace):
                 lastAppliedLayoutPhysicalRect = physicalRect
                 lastAppliedLayoutVirtualRect = virtual
-                try await workspace.rootTilingContainer.layoutRecursive(point, width: width, height: height, virtual: virtual, context)
+                try await workspace.rootTilingContainer.layoutRecursive(point, width: width, height: height, virtual: virtual, context, dryRun: dryRun)
                 for window in workspace.children.filterIsInstance(of: Window.self) {
                     window.lastAppliedLayoutPhysicalRect = nil
                     window.lastAppliedLayoutVirtualRect = nil
-                    try await window.layoutFloatingWindow(context)
+                    try await window.layoutFloatingWindow(context, dryRun: dryRun)
                 }
             case .window(let window):
                 if window.windowId != currentlyManipulatedWithMouseWindowId {
                     lastAppliedLayoutVirtualRect = virtual
                     if window.isFullscreen && window == context.workspace.rootTilingContainer.mostRecentWindowRecursive {
                         lastAppliedLayoutPhysicalRect = nil
-                        window.layoutFullscreen(context)
+                        window.layoutFullscreen(context, dryRun: dryRun)
                     } else {
                         lastAppliedLayoutPhysicalRect = physicalRect
                         window.isFullscreen = false
-                        window.setAxFrame(point, CGSize(width: width, height: height))
+                        if !dryRun {
+                            window.setAxFrame(point, CGSize(width: width, height: height))
+                        }
                     }
                 }
             case .tilingContainer(let container):
@@ -43,9 +51,9 @@ extension TreeNode {
                 lastAppliedLayoutVirtualRect = virtual
                 switch container.layout {
                     case .tiles:
-                        try await container.layoutTiles(point, width: width, height: height, virtual: virtual, context)
+                        try await container.layoutTiles(point, width: width, height: height, virtual: virtual, context, dryRun: dryRun)
                     case .accordion:
-                        try await container.layoutAccordion(point, width: width, height: height, virtual: virtual, context)
+                        try await container.layoutAccordion(point, width: width, height: height, virtual: virtual, context, dryRun: dryRun)
                 }
             case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer,
                  .macosPopupWindowsContainer, .macosHiddenAppsWindowsContainer:
@@ -67,7 +75,7 @@ private struct LayoutContext {
 
 extension Window {
     @MainActor
-    fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
+    fileprivate func layoutFloatingWindow(_ context: LayoutContext, dryRun: Bool = false) async throws {
         let workspace = context.workspace
         let windowRect = try await getAxRect() // Probably not idempotent
         let currentMonitor = windowRect?.center.monitorApproximation
@@ -85,26 +93,30 @@ extension Window {
             newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
             newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
 
-            setAxFrame(CGPoint(x: newX, y: newY), nil)
+            if !dryRun {
+                setAxFrame(CGPoint(x: newX, y: newY), nil)
+            }
         }
         if isFullscreen {
-            layoutFullscreen(context)
+            layoutFullscreen(context, dryRun: dryRun)
             isFullscreen = false
         }
     }
 
     @MainActor
-    fileprivate func layoutFullscreen(_ context: LayoutContext) {
+    fileprivate func layoutFullscreen(_ context: LayoutContext, dryRun: Bool = false) {
         let monitorRect = noOuterGapsInFullscreen
             ? context.workspace.workspaceMonitor.visibleRect
             : context.workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
-        setAxFrame(monitorRect.topLeftCorner, CGSize(width: monitorRect.width, height: monitorRect.height))
+        if !dryRun {
+            setAxFrame(monitorRect.topLeftCorner, CGSize(width: monitorRect.width, height: monitorRect.height))
+        }
     }
 }
 
 extension TilingContainer {
     @MainActor
-    fileprivate func layoutTiles(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
+    fileprivate func layoutTiles(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext, dryRun: Bool = false) async throws {
         var point = point
         var virtualPoint = virtual.topLeftCorner
 
@@ -132,6 +144,7 @@ extension TilingContainer {
                     height: orientation == .v ? child.vWeight : height,
                 ),
                 context,
+                dryRun: dryRun,
             )
             virtualPoint = orientation == .h ? virtualPoint.addingXOffset(child.hWeight) : virtualPoint.addingYOffset(child.vWeight)
             point = orientation == .h ? point.addingXOffset(child.hWeight) : point.addingYOffset(child.vWeight)
@@ -139,7 +152,7 @@ extension TilingContainer {
     }
 
     @MainActor
-    fileprivate func layoutAccordion(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
+    fileprivate func layoutAccordion(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext, dryRun: Bool = false) async throws {
         guard let mruIndex: Int = mostRecentChild?.ownIndex else { return }
         for (index, child) in children.enumerated() {
             let padding = CGFloat(config.accordionPadding)
@@ -159,6 +172,7 @@ extension TilingContainer {
                         height: height,
                         virtual: virtual,
                         context,
+                        dryRun: dryRun,
                     )
                 case .v:
                     try await child.layoutRecursive(
@@ -167,6 +181,7 @@ extension TilingContainer {
                         height: height - lPadding - rPadding,
                         virtual: virtual,
                         context,
+                        dryRun: dryRun,
                     )
             }
         }

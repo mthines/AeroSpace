@@ -1,0 +1,41 @@
+= aerospace-overview(1)
+include::util/man-attributes.adoc[]
+:manname: aerospace-overview
+// tag::purpose[]
+:manpurpose: Show a Mission Control-style overview of selected workspaces
+// end::purpose[]
+
+// =========================================================== Synopsis
+== Synopsis
+[verse]
+// tag::synopsis[]
+aerospace overview
+
+// end::synopsis[]
+
+// =========================================================== Description
+== Description
+
+// tag::body[]
+{manpurpose}
+
+When invoked, selected workspaces' windows are physically repositioned into a
+grid on the active monitor. Each cell shows a workspace's actual live windows
+rendered natively. A dimming overlay appears behind the repositioned windows.
+
+Use arrow keys or hjkl to navigate between workspace cells, Enter to switch
+focus to the selected workspace, or Esc to close the overview without changing
+focus. All windows are restored to their exact original positions when the
+overview closes.
+
+Configure the command with the `[overview]` block in your config file.
+
+// =========================================================== Options
+include::util/conditional-options-header.adoc[]
+
+-h, --help:: Print help
+
+// end::body[]
+
+// =========================================================== Footer
+include::util/man-footer.adoc[]

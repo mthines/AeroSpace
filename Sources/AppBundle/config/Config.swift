@@ -60,8 +60,29 @@ struct Config: ConvenienceCopyable {
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: [any Command] = []
+    var overview: OverviewConfig = OverviewConfig()
 }
 
 enum DefaultContainerOrientation: String {
     case horizontal, vertical, auto
+}
+
+struct OverviewConfig: ConvenienceCopyable, Equatable {
+    var workspaces: [String]? = nil         // nil = all non-empty workspaces
+    var excludeWorkspaces: [String] = []
+    var columns: OverviewColumns = .auto
+    var cellLabel: OverviewCellLabel = .workspaceName
+    var dimBackground: Bool = true
+    var dimOpacity: Double = 0.7
+}
+
+enum OverviewColumns: Equatable {
+    case auto
+    case fixed(Int)
+}
+
+enum OverviewCellLabel: String, CaseIterable, Equatable {
+    case workspaceName = "workspace-name"
+    case appList = "app-list"
+    case both = "both"
 }

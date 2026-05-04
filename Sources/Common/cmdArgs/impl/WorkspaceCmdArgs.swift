@@ -44,28 +44,35 @@ extension WorkspaceCmdArgs {
 public enum WorkspaceTarget: Equatable, Sendable {
     case relative(NextPrev)
     case direct(WorkspaceName)
+    /// Grid direction. Only meaningful while the overview is open — falls back to a
+    /// silent no-op when triggered outside it.
+    case direction(CardinalDirection)
 
     public var isRelatve: Bool {
         switch self {
             case .relative: true
-            default: false
+            case .direct, .direction: false
         }
     }
 
     public func workspaceNameOrNil() -> WorkspaceName? {
         switch self {
             case .direct(let name): name
-            case .relative: nil
+            case .relative, .direction: nil
         }
     }
 }
 
-let workspaceTargetPlaceholder = "(<workspace-name>|next|prev)"
+let workspaceTargetPlaceholder = "(<workspace-name>|next|prev|left|right|up|down)"
 
 func parseWorkspaceTarget(i: PosArgParserInput) -> ParsedCliArgs<WorkspaceTarget> {
     switch i.arg {
         case "next": .succ(.relative(.next), advanceBy: 1)
         case "prev": .succ(.relative(.prev), advanceBy: 1)
+        case "left": .succ(.direction(.left), advanceBy: 1)
+        case "right": .succ(.direction(.right), advanceBy: 1)
+        case "up": .succ(.direction(.up), advanceBy: 1)
+        case "down": .succ(.direction(.down), advanceBy: 1)
         default: .init(WorkspaceName.parse(i.arg).map(WorkspaceTarget.direct), advanceBy: 1)
     }
 }

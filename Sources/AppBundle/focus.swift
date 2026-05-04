@@ -72,6 +72,23 @@ private struct FrozenFocus: AeroAny, Equatable, Sendable {
     let status = newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
 
     newFocus.windowOrNil?.markAsMostRecentChild()
+
+    // Keep overview in sync with focus changes: refresh if the new focus is on an
+    // eligible workspace, deactivate if it lands somewhere outside the grid.
+    if isOverviewActive && !OverviewManager.shared.isClosing {
+        if let win = newFocus.windowOrNil {
+            if OverviewManager.shared.isWindowInOverview(win.windowId) {
+                OverviewHUD.shared.syncSelectionToActiveWorkspace()
+            } else if OverviewManager.shared.isWorkspaceEligibleForOverview(win.nodeWorkspace?.name) {
+                Task { @MainActor in try? await OverviewManager.shared.refreshLayout() }
+            } else {
+                Task { @MainActor in try? await OverviewManager.shared.deactivate(selectWorkspace: nil) }
+            }
+        } else {
+            Task { @MainActor in try? await OverviewManager.shared.refreshLayout() }
+        }
+    }
+
     return status
 }
 extension Window {

@@ -26,6 +26,13 @@ struct WorkspaceCommand: Command {
                 if args.autoBackAndForth && focusedWs.name == workspaceName {
                     return WorkspaceBackAndForthCommand(args: WorkspaceBackAndForthCmdArgs(rawArgs: [])).run(env, io)
                 }
+            case .direction(let dir):
+                // Direction targets are overview-only — the grid order is what makes
+                // up/down/left/right meaningful. Outside the overview, no-op.
+                guard isOverviewActive,
+                      let next = OverviewManager.shared.adjacentSelectedWorkspace(from: focusedWs.name, direction: dir)
+                else { return .succ }
+                return .from(bool: next.focusWorkspace())
         }
         if focusedWs.name == workspaceName {
             return switch args.failIfNoop {
@@ -42,12 +49,21 @@ struct WorkspaceCommand: Command {
 @MainActor func getNextPrevWorkspace(current: Workspace, isNext: Bool, wrapAround: Bool, stdin: String?, target: LiveFocus) -> Workspace? {
     let stdinWorkspaces: [String] = stdin?.split(separator: "\n").map { String($0).trim() }.filter { !$0.isEmpty } ?? []
     let currentMonitor = current.workspaceMonitor
-    let workspaces: [Workspace] = stdin != nil
-        ? stdinWorkspaces.map { Workspace.get(byName: $0) }
-        : Workspace.all.filter { $0.workspaceMonitor.rect.topLeftCorner == currentMonitor.rect.topLeftCorner }
-            .toSet()
-            .union([current])
-            .sorted()
+    let displayed = OverviewManager.shared.displayedWorkspaces()
+    let workspaces: [Workspace] =
+        if !displayed.isEmpty {
+            // While the overview is open, iterate only the workspaces in the grid so
+            // next/prev visits the same set the user sees (skips empty workspaces and
+            // honors the [overview] allowlist/excludelist).
+            displayed
+        } else if stdin != nil {
+            stdinWorkspaces.map { Workspace.get(byName: $0) }
+        } else {
+            Workspace.all.filter { $0.workspaceMonitor.rect.topLeftCorner == currentMonitor.rect.topLeftCorner }
+                .toSet()
+                .union([current])
+                .sorted()
+        }
     let index = workspaces.firstIndex(where: { $0 == target.workspace }) ?? 0
     let workspace: Workspace? = switch wrapAround {
         case true: workspaces.get(wrappingIndex: isNext ? index + 1 : index - 1)

@@ -47,6 +47,16 @@ struct FocusCommand: Command {
                     case .dfsPrev: currentIndex - 1
                 }
                 if !(0 ..< windows.count).contains(targetIndex) {
+                    // In overview mode, dfsPrev/dfsNext at the workspace boundary jumps
+                    // to the grid-adjacent workspace instead of wrapping in-workspace.
+                    if isOverviewActive {
+                        let direction: CardinalDirection = (nextPrev == .dfsNext) ? .down : .up
+                        if let nextWs = OverviewManager.shared.adjacentSelectedWorkspace(
+                            from: target.workspace.name, direction: direction,
+                        ) {
+                            return .from(bool: nextWs.focusWorkspace())
+                        }
+                    }
                     switch args.boundariesAction {
                         case .stop: return .succ
                         case .fail: return .fail
@@ -65,6 +75,12 @@ struct FocusCommand: Command {
     _ args: FocusCmdArgs,
     _ direction: CardinalDirection,
 ) -> BinaryExitCode {
+    // In overview mode, ctrl+arrow at a workspace edge jumps to the grid-adjacent
+    // workspace instead of falling through to the boundaries action.
+    if isOverviewActive,
+       let nextWs = OverviewManager.shared.adjacentSelectedWorkspace(from: target.workspace.name, direction: direction) {
+        return .from(bool: nextWs.focusWorkspace())
+    }
     switch args.boundaries {
         case .workspace:
             return switch args.boundariesAction {
