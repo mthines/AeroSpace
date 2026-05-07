@@ -42,12 +42,17 @@ struct WorkspaceCommand: Command {
 @MainActor func getNextPrevWorkspace(current: Workspace, isNext: Bool, wrapAround: Bool, stdin: String?, target: LiveFocus) -> Workspace? {
     let stdinWorkspaces: [String] = stdin?.split(separator: "\n").map { String($0).trim() }.filter { !$0.isEmpty } ?? []
     let currentMonitor = current.workspaceMonitor
-    let workspaces: [Workspace] = stdin != nil
+    var workspaces: [Workspace] = stdin != nil
         ? stdinWorkspaces.map { Workspace.get(byName: $0) }
         : Workspace.all.filter { $0.workspaceMonitor.rect.topLeftCorner == currentMonitor.rect.topLeftCorner }
             .toSet()
             .union([current])
             .sorted()
+    if config.workspaceIterationSkipEmpty {
+        // Always keep `current` in the list so firstIndex resolves and prev/next is
+        // meaningful even when the user is sitting on an empty workspace.
+        workspaces = workspaces.filter { !$0.isEffectivelyEmpty || $0 == current }
+    }
     let index = workspaces.firstIndex(where: { $0 == target.workspace }) ?? 0
     let workspace: Workspace? = switch wrapAround {
         case true: workspaces.get(wrappingIndex: isNext ? index + 1 : index - 1)

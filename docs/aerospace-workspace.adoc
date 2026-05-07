@@ -29,6 +29,11 @@ Focuses next or previous workspace in *the list*.
 * If `--stdin` is specified, then *the list* is taken from stdin
 * Otherwise, *the list* is defined as all workspaces on focused monitor in alphabetical order
 
+If the top-level config option `workspace-iteration-skip-empty = true` is set, empty
+workspaces are skipped during iteration (the currently focused workspace is always
+kept in the list so iteration remains stable when sitting on an empty workspace).
+Default is `false` (no skipping, preserves existing behavior).
+
 // =========================================================== Options
 include::util/conditional-options-header.adoc[]
 

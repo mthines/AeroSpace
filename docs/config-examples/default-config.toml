@@ -45,6 +45,12 @@ on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 # Also see: https://nikitabobko.github.io/AeroSpace/goodies#disable-hide-app
 automatically-unhide-macos-hidden-apps = false
 
+# When 'workspace next' / 'workspace prev' iterates the workspace list, skip empty
+# workspaces. The currently focused workspace is always kept in the list so
+# iteration is stable when sitting on an empty workspace.
+# Fallback value (if you omit the key): workspace-iteration-skip-empty = false
+workspace-iteration-skip-empty = false
+
 # List of workspaces that should stay alive even when they contain no windows,
 # even when they are invisible.
 # This config option is only available since 'config-version = 2'
