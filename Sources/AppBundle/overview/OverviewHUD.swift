@@ -32,7 +32,7 @@ import Common
         cells: [OverviewCellInfo],
         columnCount: Int,
         onCommit: @escaping @MainActor (String) -> Void,
-        onCancel: @escaping @MainActor () -> Void
+        onCancel: @escaping @MainActor () -> Void,
     ) {
         self.cells = cells
         self.onCommit = onCommit

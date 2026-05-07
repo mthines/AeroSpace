@@ -4,6 +4,10 @@ extension Workspace {
     @MainActor
     func layoutWorkspace(dryRun: Bool = false) async throws {
         if isEffectivelyEmpty { return }
+        // Block real layout for the anchor monitor's workspaces — overview owns those
+        // frames. Off-anchor monitors keep laying out normally so cross-monitor workspace
+        // switches reflect on screen while the overview is open.
+        if isOverviewActive && !dryRun && OverviewManager.shared.isOnAnchorMonitor(self) { return }
         let rect = workspaceMonitor.visibleRectPaddedByOuterGaps
         // If monitors are aligned vertically and the monitor below has smaller width, then macOS may not allow the
         // window on the upper monitor to take full width. rect.height - 1 resolves this problem
@@ -20,7 +24,8 @@ extension TreeNode {
     /// while keeping the corner-hidden windows visually in place.
     @MainActor
     fileprivate func layoutRecursive(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext, dryRun: Bool = false) async throws {
-        if isOverviewActive && !dryRun { return }
+        // Anchor-monitor guard now lives in Workspace.layoutWorkspace (the only entry
+        // point), so off-anchor monitors recurse normally even while overview is open.
         let physicalRect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         switch nodeCases {
             case .workspace(let workspace):

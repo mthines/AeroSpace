@@ -162,14 +162,11 @@ enum OptimalHideCorner {
 
 @MainActor
 private func layoutWorkspaces() async throws {
-    // While the overview is open, OverviewManager owns every window's physical frame
-    // — route layout changes through refreshLayout instead of letting the normal pass
-    // re-hide our cell-positioned windows in the corner.
-    if isOverviewActive {
-        if !OverviewManager.shared.isClosing && !OverviewManager.shared.isRefreshing {
-            Task { @MainActor in try? await OverviewManager.shared.refreshLayout() }
-        }
-        return
+    // While the overview is open, OverviewManager owns every window's physical frame on
+    // its anchor monitor — route those changes through refreshLayout. Off-anchor monitors
+    // continue through the normal layout pass below so workspace switches there reflect.
+    if isOverviewActive && !OverviewManager.shared.isClosing && !OverviewManager.shared.isRefreshing {
+        Task { @MainActor in try? await OverviewManager.shared.refreshLayout() }
     }
     if !TrayMenuModel.shared.isEnabled {
         for workspace in Workspace.all {
@@ -206,11 +203,13 @@ private func layoutWorkspaces() async throws {
 
     // to reduce flicker, first unhide visible workspaces, then hide invisible ones
     for monitor in monitors {
+        if isOverviewActive && OverviewManager.shared.isAnchorMonitor(monitor) { continue }
         let workspace = monitor.activeWorkspace
         workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!
         try await workspace.layoutWorkspace()
     }
     for workspace in Workspace.all where !workspace.isVisible {
+        if isOverviewActive && OverviewManager.shared.isAnchorMonitor(workspace.workspaceMonitor) { continue }
         let corner = monitorToOptimalHideCorner[workspace.workspaceMonitor.rect.topLeftCorner] ?? .bottomRightCorner
         for window in workspace.allLeafWindowsRecursive {
             try await (window as! MacWindow).hideInCorner(corner) // todo as!

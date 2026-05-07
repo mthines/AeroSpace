@@ -26,6 +26,22 @@ import Common
 
     func isWindowInOverview(_ windowId: UInt32) -> Bool { snapshotIds.contains(windowId) }
 
+    /// True when the given workspace lives on the monitor the overview is anchored to.
+    /// Lets cross-monitor focus changes skip the overview-sync hook so the grid keeps
+    /// running on monitor A while the user works on monitor B.
+    func isOnAnchorMonitor(_ workspace: Workspace) -> Bool {
+        guard let corner = anchorMonitorCorner else { return false }
+        return workspace.workspaceMonitor.rect.topLeftCorner == corner
+    }
+
+    /// True when the given monitor is the anchor monitor.
+    /// Used by `layoutWorkspaces` to skip the anchor monitor — overview owns its frames —
+    /// while still laying out other monitors so cross-monitor workspace switches reflect.
+    func isAnchorMonitor(_ monitor: Monitor) -> Bool {
+        guard let corner = anchorMonitorCorner else { return false }
+        return monitor.rect.topLeftCorner == corner
+    }
+
     /// True if the named workspace would pass the overview's allowlist/excludelist filter.
     /// Empty workspaces still return true here — they're filtered at activation by
     /// `selectWorkspaces`, which combines this check with isEffectivelyEmpty.
@@ -119,13 +135,12 @@ import Common
         var newSnapshots: [OverviewWindowSnapshot] = []
         for workspace in selectedWorkspaces {
             for window in workspace.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }) {
-                let frame: Rect?
-                if let existing = existingFrames[window.windowId] {
-                    frame = existing
+                let frame: Rect? = if let existing = existingFrames[window.windowId] {
+                    existing
                 } else if let layoutRect = window.lastAppliedLayoutPhysicalRect {
-                    frame = layoutRect
+                    layoutRect
                 } else {
-                    frame = try await window.getAxRect()
+                    try await window.getAxRect()
                 }
                 guard let frame else { continue }
                 newSnapshots.append(OverviewWindowSnapshot(window: window, frame: frame, workspaceName: workspace.name))
@@ -160,7 +175,7 @@ import Common
             }
             try await snapshot.window.setAxFrameBlocking(
                 targetFrame.topLeftCorner,
-                CGSize(width: targetFrame.width, height: targetFrame.height)
+                CGSize(width: targetFrame.width, height: targetFrame.height),
             )
         }
         self.snapshots = newSnapshots
@@ -181,7 +196,7 @@ import Common
             onCancel: { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in try? await self.deactivate(selectWorkspace: nil) }
-            }
+            },
         )
     }
 
@@ -204,7 +219,7 @@ import Common
         for snapshot in snapshots {
             try await snapshot.window.setAxFrameBlocking(
                 snapshot.frame.topLeftCorner,
-                CGSize(width: snapshot.frame.width, height: snapshot.frame.height)
+                CGSize(width: snapshot.frame.width, height: snapshot.frame.height),
             )
         }
 
@@ -258,8 +273,8 @@ import Common
             case 2: return 2
             case 3: return 3
             case 4: return 2
-            case 5...6: return 3
-            case 7...8: return 4
+            case 5 ... 6: return 3
+            case 7 ... 8: return 4
             default: return 3
         }
     }
@@ -289,7 +304,7 @@ import Common
             let y = monitorRect.topLeftY + padding + CGFloat(row) * (cellH + padding)
             return OverviewCell(
                 workspaceName: workspace.name,
-                frame: Rect(topLeftX: x, topLeftY: y, width: cellW, height: cellH)
+                frame: Rect(topLeftX: x, topLeftY: y, width: cellW, height: cellH),
             )
         }
         return (cells, columns)
@@ -330,7 +345,7 @@ import Common
                 id: cell.workspaceName,
                 workspaceName: cell.workspaceName,
                 hudFrame: hudFrame,
-                label: formatCellLabel(workspaceName: cell.workspaceName, appNames: appNames, style: cellLabel)
+                label: formatCellLabel(workspaceName: cell.workspaceName, appNames: appNames, style: cellLabel),
             )
         }
     }

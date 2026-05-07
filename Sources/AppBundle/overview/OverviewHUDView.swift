@@ -34,7 +34,7 @@ struct OverviewHUDView: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(
                     isSelected ? Color.white : Color.white.opacity(0.25),
-                    lineWidth: isSelected ? 2.5 : 1
+                    lineWidth: isSelected ? 2.5 : 1,
                 )
                 .frame(width: cell.hudFrame.width, height: cell.hudFrame.height)
                 .allowsHitTesting(false)
@@ -46,7 +46,7 @@ struct OverviewHUDView: View {
                 .padding(.vertical, 3)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.55))
+                        .fill(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.55)),
                 )
                 .padding(.top, 6)
                 .allowsHitTesting(false)

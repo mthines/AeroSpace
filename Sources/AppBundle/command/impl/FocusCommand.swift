@@ -78,7 +78,8 @@ struct FocusCommand: Command {
     // In overview mode, ctrl+arrow at a workspace edge jumps to the grid-adjacent
     // workspace instead of falling through to the boundaries action.
     if isOverviewActive,
-       let nextWs = OverviewManager.shared.adjacentSelectedWorkspace(from: target.workspace.name, direction: direction) {
+       let nextWs = OverviewManager.shared.adjacentSelectedWorkspace(from: target.workspace.name, direction: direction)
+    {
         return .from(bool: nextWs.focusWorkspace())
     }
     switch args.boundaries {

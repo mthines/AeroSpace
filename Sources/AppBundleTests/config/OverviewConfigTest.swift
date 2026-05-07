@@ -27,7 +27,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             workspaces = ['1', '2', '3']
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.workspaces, ["1", "2", "3"])
@@ -39,7 +39,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             workspaces = []
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.workspaces, [])
@@ -52,7 +52,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             exclude-workspaces = ['9']
-            """
+            """,
         )
         assertEquals(errors, [])
         XCTAssertNil(config.overview.workspaces)
@@ -67,11 +67,11 @@ final class OverviewConfigTest: XCTestCase {
             [overview]
             workspaces = ['1', '2']
             exclude-workspaces = ['9']
-            """
+            """,
         )
         XCTAssertTrue(
             errors.singleOrNil()?.contains("mutually exclusive") == true,
-            "Expected mutual exclusion error, got: \(errors)"
+            "Expected mutual exclusion error, got: \(errors)",
         )
     }
 
@@ -82,7 +82,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             columns = 'auto'
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.columns, OverviewColumns.auto)
@@ -93,7 +93,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             columns = 3
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.columns, OverviewColumns.fixed(3))
@@ -104,7 +104,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             columns = -1
-            """
+            """,
         )
         XCTAssertFalse(errors.isEmpty, "Expected error for negative columns")
     }
@@ -114,7 +114,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             columns = 0
-            """
+            """,
         )
         XCTAssertFalse(errors.isEmpty, "Expected error for zero columns")
     }
@@ -124,7 +124,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             columns = 'invalid'
-            """
+            """,
         )
         XCTAssertFalse(errors.isEmpty, "Expected error for invalid columns string")
     }
@@ -136,7 +136,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             cell-label = 'workspace-name'
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.cellLabel, OverviewCellLabel.workspaceName)
@@ -147,7 +147,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             cell-label = 'app-list'
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.cellLabel, OverviewCellLabel.appList)
@@ -158,7 +158,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             cell-label = 'both'
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.cellLabel, OverviewCellLabel.both)
@@ -169,7 +169,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             cell-label = 'screenshot'
-            """
+            """,
         )
         XCTAssertFalse(errors.isEmpty, "Expected error for invalid cell-label")
     }
@@ -181,7 +181,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             dim-background = false
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.dimBackground, false)
@@ -192,7 +192,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             dim-opacity = 40
-            """
+            """,
         )
         assertEquals(errors, [])
         XCTAssertEqual(config.overview.dimOpacity, 0.40, accuracy: 0.001)
@@ -203,7 +203,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             dim-opacity = 0
-            """
+            """,
         )
         assertEquals(errors, [])
         XCTAssertEqual(config.overview.dimOpacity, 0.0, accuracy: 0.001)
@@ -214,7 +214,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             dim-opacity = 100
-            """
+            """,
         )
         assertEquals(errors, [])
         XCTAssertEqual(config.overview.dimOpacity, 1.0, accuracy: 0.001)
@@ -225,7 +225,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [overview]
             dim-opacity = 101
-            """
+            """,
         )
         XCTAssertFalse(errors.isEmpty, "Expected error for dim-opacity out of range")
     }
@@ -241,7 +241,7 @@ final class OverviewConfigTest: XCTestCase {
             cell-label = 'both'
             dim-background = true
             dim-opacity = 70
-            """
+            """,
         )
         assertEquals(errors, [])
         assertEquals(config.overview.workspaces, ["1", "2"])
@@ -258,7 +258,7 @@ final class OverviewConfigTest: XCTestCase {
             """
             [mode.main.binding]
             ctrl-alt-o = 'overview'
-            """
+            """,
         )
         assertEquals(errors, [])
         let modeBindings = config.modes[mainModeId]?.bindings ?? [:]
