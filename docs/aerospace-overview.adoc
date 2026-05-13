@@ -9,7 +9,7 @@ include::util/man-attributes.adoc[]
 == Synopsis
 [verse]
 // tag::synopsis[]
-aerospace overview
+aerospace overview [--suspend|--resume]
 
 // end::synopsis[]
 
@@ -34,6 +34,18 @@ Configure the command with the `[overview]` block in your config file.
 include::util/conditional-options-header.adoc[]
 
 -h, --help:: Print help
+
+--suspend:: Pause the overview without tearing it down: hide the HUD and dim
+panel, restore window frames, and keep the anchor monitor and snapshot state.
+Use before switching to a non-grid workspace (e.g. a scratchpad) so the next
+`--resume` can re-establish the same grid. No-op when the overview is closed
+or already suspended.
+
+--resume:: Re-establish a suspended overview on its original anchor monitor.
+Windows are re-snapshotted so any moves made while suspended are reflected.
+No-op when the overview is not suspended.
+
+`--suspend` and `--resume` are mutually exclusive.
 
 // end::body[]
 

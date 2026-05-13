@@ -126,7 +126,7 @@ let move_help_generated = """
     USAGE: move [-h|--help] [--window-id <window-id>] [--boundaries <boundary>] [--boundaries-action <boundary-action>] (left|down|up|right)
     """
 let overview_help_generated = """
-    USAGE: overview
+    USAGE: overview [-h|--help] [--suspend|--resume]
     """
 let reload_config_help_generated = """
     USAGE: reload-config [-h|--help] [--no-gui] [--dry-run]

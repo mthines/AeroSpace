@@ -24,6 +24,12 @@ import Common
     /// triggered by AX events from our own setAxFrameBlocking calls.
     private(set) var isRefreshing: Bool = false
 
+    /// True while the overview is suspended — HUD/dim hidden, window frames restored,
+    /// snapshots and anchor preserved so `resume()` can re-establish the same grid.
+    /// `isOverviewActive` is false while suspended so the normal layout pass owns
+    /// window placement on every monitor (the user is working elsewhere).
+    private(set) var isSuspended: Bool = false
+
     func isWindowInOverview(_ windowId: UInt32) -> Bool { snapshotIds.contains(windowId) }
 
     /// True when the given workspace lives on the monitor the overview is anchored to.
@@ -76,7 +82,44 @@ import Common
             try await deactivate(selectWorkspace: nil)
             return
         }
+        // Explicit re-activation discards any preserved suspend state — the hotkey
+        // means "show me the grid on this monitor now", not "resume the old one".
+        isSuspended = false
+        snapshots = []
+        snapshotIds = []
         anchorMonitorCorner = focus.workspace.workspaceMonitor.rect.topLeftCorner
+        isOverviewActive = true
+        try await applyOverviewLayout(initialOpen: true)
+    }
+
+    /// Pause the overview: hide HUD + dim, restore window frames, keep snapshot data.
+    /// Lets the user visit a non-grid workspace (e.g. a scratchpad) without tearing
+    /// down the overview; `resume()` re-establishes the grid on the same monitor.
+    /// Safe to call when the overview is closed or already suspended (no-op).
+    func suspend() async throws {
+        guard isOverviewActive, !isSuspended, !isClosing else { return }
+        isSuspended = true
+        OverviewHUD.shared.hide()
+        OverviewDimPanel.shared.close()
+        // Restore each window from its snapshot. Sequential to avoid AX rate-limit
+        // issues when multiple windows belong to the same app.
+        for snapshot in snapshots {
+            try await snapshot.window.setAxFrameBlocking(
+                snapshot.frame.topLeftCorner,
+                CGSize(width: snapshot.frame.width, height: snapshot.frame.height),
+            )
+        }
+        // Release the layout lock so the upcoming workspace switch (and every monitor
+        // in general) lays out normally while the overview is paused.
+        isOverviewActive = false
+        scheduleCancellableCompleteRefreshSession(.hotkeyBinding)
+    }
+
+    /// Resume a suspended overview: re-snapshot current window positions and re-apply
+    /// the grid on the original anchor monitor. Safe to call when not suspended (no-op).
+    func resume() async throws {
+        guard isSuspended, !isClosing else { return }
+        isSuspended = false
         isOverviewActive = true
         try await applyOverviewLayout(initialOpen: true)
     }
@@ -206,6 +249,7 @@ import Common
         defer {
             isOverviewActive = false
             isClosing = false
+            isSuspended = false
             snapshots = []
             snapshotIds = []
             anchorMonitorCorner = nil
