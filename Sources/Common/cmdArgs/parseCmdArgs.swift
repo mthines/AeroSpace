@@ -11,7 +11,7 @@ public func parseCmdArgs(_ args: StrArrSlice) -> ParsedCmd<any CmdArgs> {
 }
 
 public protocol CmdArgs:
-    ConvenienceCopyable,
+    ConvenienceMutable,
     Equatable,
     CustomStringConvertible,
     AeroAny,
@@ -22,10 +22,11 @@ public protocol CmdArgs:
     var commonState: CmdArgsCommonState { get set }
 }
 
-public struct CmdArgsCommonState: ConvenienceCopyable, Equatable, Sendable {
+public struct CmdArgsCommonState: ConvenienceMutable, Equatable, Sendable {
     let rawArgsForStrRepr: EquatableNoop<StrArrSlice>
     var windowId: UInt32? = nil
     var workspaceName: WorkspaceName? = nil
+    public var explicitStdinFlag: Bool? = nil
 
     public init(_ raw: StrArrSlice) { rawArgsForStrRepr = .init(raw) }
 }
@@ -67,13 +68,12 @@ public struct CmdParser<Root>: Sendable {
 
     init(
         kind: CmdKind,
-        allowInConfig: Bool,
         help: String,
         flags: [String: any ArgParserProtocol<SubArgParserInput, Root, ()>],
         posArgs: [any ArgParserProtocol<PosArgParserInput, Root, PosArgParserContext>],
         conflictingOptions: [Set<String>] = [],
     ) {
-        self.info = CmdStaticInfo(help: help, kind: kind, allowInConfig: allowInConfig)
+        self.info = CmdStaticInfo(help: help, kind: kind)
         self.flags = flags
         self.positionalArgs = posArgs
         self.conflictingOptions = conflictingOptions
@@ -83,15 +83,12 @@ public struct CmdParser<Root>: Sendable {
 public struct CmdStaticInfo: Equatable, Sendable {
     public let help: String
     public let kind: CmdKind
-    public let allowInConfig: Bool // Query commands are prohibited in config
 
     public init(
         help: String,
         kind: CmdKind,
-        allowInConfig: Bool,
     ) {
         self.help = help
         self.kind = kind
-        self.allowInConfig = allowInConfig
     }
 }

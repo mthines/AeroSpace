@@ -13,7 +13,7 @@ struct FrozenMonitor: Sendable {
     let topLeftCorner: CGPoint
     let visibleWorkspace: String
 
-    @MainActor init(_ monitor: Monitor) {
+    @MainActor init(_ monitor: MonitorInfo) {
         topLeftCorner = monitor.rect.topLeftCorner
         visibleWorkspace = monitor.activeWorkspace.name
     }
@@ -39,13 +39,13 @@ struct FrozenWorkspace: Sendable {
 
 @MainActor func cacheClosedWindowIfNeeded() {
     let allWs = Workspace.all
-    let allWindowIds = allWs.flatMap { collectAllWindowIds(workspace: $0) }.toSet()
+    let allWindowIds = allWs.flatMap { collectAllWindowIdsRecursive($0) }.toSet()
     if allWindowIds.isSubset(of: closedWindowsCache.windowIds) {
         return // already cached
     }
     closedWindowsCache = FrozenWorld(
         workspaces: allWs.map { FrozenWorkspace($0) },
-        monitors: monitors.map(FrozenMonitor.init),
+        monitors: monitorInfos.map(FrozenMonitor.init),
         windowIds: allWindowIds,
     )
 }
@@ -54,7 +54,7 @@ struct FrozenWorkspace: Sendable {
     if !closedWindowsCache.windowIds.contains(newlyDetectedWindow.windowId) {
         return false
     }
-    let monitors = monitors
+    let monitors = monitorInfos
     let topLeftCornerToMonitor = monitors.grouped { $0.rect.topLeftCorner }
 
     for frozenWorkspace in closedWindowsCache.workspaces {
@@ -73,7 +73,7 @@ struct FrozenWorkspace: Sendable {
         prevRoot.unbindFromParent()
         restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST)
         for window in (potentialOrphans - workspace.rootTilingContainer.allLeafWindowsRecursive) {
-            try await window.relayoutWindow(on: workspace, forceTile: true)
+            try await window.relayoutWindow(on: workspace, .cancellable, forceTile: true)
         }
     }
 

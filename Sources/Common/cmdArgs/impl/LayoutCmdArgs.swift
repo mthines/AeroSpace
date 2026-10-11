@@ -3,12 +3,17 @@ public struct LayoutCmdArgs: CmdArgs {
     fileprivate init(rawArgs: StrArrSlice) { self.commonState = .init(rawArgs) }
     public static let parser: CmdParser<Self> = .init(
         kind: .layout,
-        allowInConfig: true,
         help: layout_help_generated,
         flags: [
             "--window-id": windowIdSubArgParser(),
+            "--workspace": workspaceSubArgParser(),
+            "--root": trueBoolFlag(\.root),
+            "--fail-if-noop": trueBoolFlag(\.failIfNoop),
         ],
         posArgs: [newMandatoryPosArgParser(\.toggleBetween, parseToggleBetween, placeholder: LayoutDescription.unionLiteral)],
+        conflictingOptions: [
+            ["--window-id", "--workspace"],
+        ],
     )
 
     public var toggleBetween: Lateinit<[LayoutDescription]> = .uninitialized
@@ -24,7 +29,12 @@ public struct LayoutCmdArgs: CmdArgs {
         case h_accordion, v_accordion, h_tiles, v_tiles
         case tiling, floating
     }
+
+    public var root: Bool = false
+    public var failIfNoop: Bool = false
 }
+
+public let layoutCommandRootFlagIncompatibilityMsg = "layout command: --root and tiling|floating are incompatible"
 
 private func parseToggleBetween(input: PosArgParserInput) -> ParsedCliArgs<[LayoutCmdArgs.LayoutDescription]> {
     let args = input.nonFlagArgs()
@@ -47,10 +57,23 @@ private func parseToggleBetween(input: PosArgParserInput) -> ParsedCliArgs<[Layo
 }
 
 func parseLayoutCmdArgs(_ args: StrArrSlice) -> ParsedCmd<LayoutCmdArgs> {
-    parseSpecificCmdArgs(LayoutCmdArgs(rawArgs: args), args).map {
-        check(!$0.toggleBetween.val.isEmpty)
-        return $0
-    }
+    parseSpecificCmdArgs(LayoutCmdArgs(rawArgs: args), args)
+        .map {
+            check(!$0.toggleBetween.val.isEmpty)
+            return $0
+        }
+        .filter(layoutCommandRootFlagIncompatibilityMsg) { cmdArgs in
+            !cmdArgs.root || cmdArgs.toggleBetween.val.allSatisfy {
+                switch $0 {
+                    case .floating, .tiling: false
+                    case .accordion, .h_accordion, .h_tiles,
+                         .horizontal, .tiles, .v_accordion, .v_tiles,
+                         .vertical: true
+                }
+            }
+        }
+        .filter("--workspace flag requires using an explicit --root flag") { ($0.workspaceName != nil).implies($0.root) }
+        .filter("--fail-if-noop allows only one <target-layout> argument") { $0.failIfNoop.implies($0.toggleBetween.val.count == 1) }
 }
 
 extension String {

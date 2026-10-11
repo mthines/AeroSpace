@@ -15,7 +15,7 @@ aerospace move-node-to-workspace [-h|--help] [--focus-follows-window] [--wrap-ar
 aerospace move-node-to-workspace [-h|--help] [--focus-follows-window]
                                  (left|right|up|down)
 aerospace move-node-to-workspace [-h|--help] [--focus-follows-window] [--fail-if-noop]
-                                 [--window-id <window-id>] <workspace-name>
+                                 [--window-id <window-id>] [--] <workspace-name>
 
 // end::synopsis[]
 

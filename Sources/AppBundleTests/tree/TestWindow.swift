@@ -3,6 +3,7 @@ import AppKit
 
 final class TestWindow: Window, CustomStringConvertible {
     private var _rect: Rect?
+    var isMacosFullscreenForTest = false
 
     @MainActor
     private init(_ id: UInt32, _ parent: NonLeafTreeNodeObject, _ adaptiveWeight: CGFloat, _ rect: Rect?) {
@@ -30,13 +31,15 @@ final class TestWindow: Window, CustomStringConvertible {
         unbindFromParent()
     }
 
-    override var title: String {
-        get async { // redundant async. todo create bug report to Swift
-            description
-        }
-    }
+    override func getTitle(_ cm: CancellationMode) async throws -> String { description }
 
-    @MainActor override func getAxRect() async throws -> Rect? { // todo change to not Optional
+    @MainActor override func getAxRect(_ cm: CancellationMode) async throws -> Rect? { // todo change to not Optional
         _rect
     }
+
+    @MainActor override func getAxSize(_ cm: CancellationMode) async throws -> CGSize? {
+        _rect.map { CGSize(width: $0.width, height: $0.height) }
+    }
+
+    override func isMacosFullscreen(_ cm: CancellationMode) async throws -> Bool { isMacosFullscreenForTest }
 }

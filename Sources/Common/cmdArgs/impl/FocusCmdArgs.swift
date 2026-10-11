@@ -3,7 +3,6 @@ public struct FocusCmdArgs: CmdArgs {
     fileprivate init(rawArgs: StrArrSlice) { self.commonState = .init(rawArgs) }
     public static let parser: CmdParser<Self> = .init(
         kind: .focus,
-        allowInConfig: true,
         help: focus_help_generated,
         flags: [
             "--ignore-floating": falseBoolFlag(\.floatingAsTiling),
@@ -12,6 +11,8 @@ public struct FocusCmdArgs: CmdArgs {
 
             "--boundaries": ArgParser(\.rawBoundaries, upcastArgParserFun(parseBoundaries)),
             "--boundaries-action": ArgParser(\.rawBoundariesAction, upcastArgParserFun(parseBoundariesAction)),
+            "--fail-if-fullscreen": trueBoolFlag(\.failIfFullscreen),
+            "--fail-if-macos-native-fullscreen": trueBoolFlag(\.failIfMacosNativeFullscreen),
             "--wrap-around": trueBoolFlag(\.wrapAroundAlias),
         ],
         posArgs: [ArgParser(\.cardinalOrDfsDirection, upcastArgParserFun(parseCardinalOrDfsDirection))],
@@ -23,6 +24,8 @@ public struct FocusCmdArgs: CmdArgs {
 
     public var rawBoundaries: Boundaries? = nil // todo cover boundaries wrapping with tests
     public var rawBoundariesAction: WhenBoundariesCrossed? = nil
+    public var failIfFullscreen: Bool = false
+    public var failIfMacosNativeFullscreen: Bool = false
     fileprivate var wrapAroundAlias: Bool = false
     public var dfsIndex: UInt32? = nil
     public var cardinalOrDfsDirection: CardinalOrDfsDirection? = nil
@@ -107,6 +110,15 @@ func parseFocusCmdArgs(_ args: StrArrSlice) -> ParsedCmd<FocusCmdArgs> {
         }
         .filter("--dfs-index is incompatible with other options") {
             $0.dfsIndex == nil || $0 == FocusCmdArgs(rawArgs: args, dfsIndex: $0.dfsIndex.orDie())
+        }
+        .filter("--fail-if-fullscreen/--fail-if-macos-native-fullscreen require using (left|down|up|right) argument") {
+            if !$0.failIfFullscreen && !$0.failIfMacosNativeFullscreen {
+                return true
+            }
+            return switch $0.target {
+                case .direction: true
+                case .dfsIndex, .dfsRelative, .windowId: false
+            }
         }
         .filter("(dfs-next|dfs-prev) only supports --boundaries workspace") {
             $0.target.isDfsRelative.implies($0.boundaries == .workspace)

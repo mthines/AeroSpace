@@ -52,7 +52,7 @@ import Common
     /// True when the given monitor is the anchor monitor.
     /// Used by `layoutWorkspaces` to skip the anchor monitor — overview owns its frames —
     /// while still laying out other monitors so cross-monitor workspace switches reflect.
-    func isAnchorMonitor(_ monitor: Monitor) -> Bool {
+    func isAnchorMonitor(_ monitor: MonitorInfo) -> Bool {
         guard let corner = anchorMonitorCorner else { return false }
         return monitor.rect.topLeftCorner == corner
     }
@@ -168,15 +168,15 @@ import Common
                     OverviewHUD.shared.syncSelection(to: target)
                 }
             } else if isWorkspaceEligibleForOverview(win.nodeWorkspace?.name) {
-                Task { @MainActor in try? await self.refreshLayout() }
+                Task.startUnstructured { @MainActor in try? await self.refreshLayout() }
             } else {
-                Task { @MainActor in try? await self.deactivate(select: nil) }
+                Task.startUnstructured { @MainActor in try? await self.deactivate(select: nil) }
             }
         } else if case .windows(let workspaceName) = mode, newFocus.workspace.name != workspaceName {
             // Windows mode shows a single workspace: switching to another one closes it.
-            Task { @MainActor in try? await self.deactivate(select: nil) }
+            Task.startUnstructured { @MainActor in try? await self.deactivate(select: nil) }
         } else {
-            Task { @MainActor in try? await self.refreshLayout() }
+            Task.startUnstructured { @MainActor in try? await self.refreshLayout() }
         }
     }
 
@@ -229,7 +229,7 @@ import Common
                 } else if let layoutRect = window.lastAppliedLayoutPhysicalRect {
                     layoutRect
                 } else {
-                    try await window.getAxRect()
+                    try await window.getAxRect(.nonCancellable)
                 }
                 guard let frame else { continue }
                 newSnapshots.append(OverviewWindowSnapshot(window: window, frame: frame, cellTarget: content.target))
@@ -299,11 +299,11 @@ import Common
             initialSelection: cellTarget(for: focus),
             onCommit: { [weak self] target in
                 guard let self else { return }
-                Task { @MainActor in try? await self.deactivate(select: target) }
+                Task.startUnstructured { @MainActor in try? await self.deactivate(select: target) }
             },
             onCancel: { [weak self] in
                 guard let self else { return }
-                Task { @MainActor in try? await self.deactivate(select: nil) }
+                Task.startUnstructured { @MainActor in try? await self.deactivate(select: nil) }
             },
         )
     }
@@ -435,9 +435,9 @@ import Common
         fullscreenWindowAtOpen = nil
     }
 
-    private func resolveAnchorMonitor() -> Monitor? {
+    private func resolveAnchorMonitor() -> MonitorInfo? {
         guard let corner = anchorMonitorCorner else { return nil }
-        return monitors.first(where: { $0.rect.topLeftCorner == corner })
+        return monitorInfos.first(where: { $0.rect.topLeftCorner == corner })
     }
 
     struct OverviewCell {
@@ -526,7 +526,7 @@ import Common
                         .elements
                     label = formatCellLabel(workspaceName: workspaceName, appNames: appNames, style: config.overview.cellLabel)
                 case .window:
-                    let title = try await windows.first?.title ?? ""
+                    let title = try await windows.first?.getTitle(.nonCancellable) ?? ""
                     label = overviewWindowCellLabel(appName: windows.first?.app.name, title: title)
             }
             result.append(OverviewCellInfo(target: cell.target, hudFrame: hudFrame, label: label))
@@ -561,6 +561,6 @@ extension Workspace {
     /// in tree (dfs) order, then floating windows. Leaves out windows macOS owns —
     /// native-fullscreen and hidden-app windows — which can't be moved into a cell.
     @MainActor var overviewGridWindows: [Window] {
-        rootTilingContainer.allLeafWindowsRecursive + children.filterIsInstance(of: Window.self)
+        rootTilingContainer.allLeafWindowsRecursive + floatingWindowsContainer.children.filterIsInstance(of: Window.self)
     }
 }

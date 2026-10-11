@@ -1,12 +1,12 @@
 import Common
 
-struct Gaps: ConvenienceCopyable, Equatable, Sendable {
+struct Gaps: ConvenienceMutable, Equatable, Sendable {
     var inner: Inner
     var outer: Outer
 
     static let zero = Gaps(inner: .zero, outer: .zero)
 
-    struct Inner: ConvenienceCopyable, Equatable, Sendable {
+    struct Inner: ConvenienceMutable, Equatable, Sendable {
         var vertical: DynamicConfigValue<Int>
         var horizontal: DynamicConfigValue<Int>
 
@@ -23,7 +23,7 @@ struct Gaps: ConvenienceCopyable, Equatable, Sendable {
         }
     }
 
-    struct Outer: ConvenienceCopyable, Equatable, Sendable {
+    struct Outer: ConvenienceMutable, Equatable, Sendable {
         var left: DynamicConfigValue<Int>
         var bottom: DynamicConfigValue<Int>
         var top: DynamicConfigValue<Int>
@@ -67,7 +67,7 @@ struct ResolvedGaps {
         let right: Int
     }
 
-    @MainActor init(gaps: Gaps, monitor: any Monitor) {
+    @MainActor init(gaps: Gaps, monitor: any MonitorInfo) {
         inner = .init(
             vertical: gaps.inner.vertical.getValue(for: monitor),
             horizontal: gaps.inner.horizontal.getValue(for: monitor),
@@ -99,18 +99,18 @@ private let outerParser: [String: any ParserProtocol<Gaps.Outer>] = [
     "right": Parser(\.right, parseIntDynamicValue),
 ]
 
-private func parseIntDynamicValue(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError]) -> DynamicConfigValue<Int> {
-    parseDynamicValue(raw, ofType: Int.self, 0, backtrace, &errors)
+private func parseIntDynamicValue(_ raw: OrderedJson, _ backtrace: ConfigBacktrace, _ c: inout ConfigParserContext) -> DynamicConfigValue<Int> {
+    parseDynamicValue(raw, ofType: Int.self, 0, backtrace, &c)
 }
 
-func parseGaps(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError]) -> Gaps {
-    parseTable(raw, .zero, gapsParser, backtrace, &errors)
+func parseGaps(_ raw: OrderedJson, _ backtrace: ConfigBacktrace, _ c: inout ConfigParserContext) -> Gaps {
+    parseTable(raw, .zero, gapsParser, backtrace, &c)
 }
 
-func parseInner(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError]) -> Gaps.Inner {
-    parseTable(raw, Gaps.Inner.zero, innerParser, backtrace, &errors)
+func parseInner(_ raw: OrderedJson, _ backtrace: ConfigBacktrace, _ c: inout ConfigParserContext) -> Gaps.Inner {
+    parseTable(raw, Gaps.Inner.zero, innerParser, backtrace, &c)
 }
 
-func parseOuter(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError]) -> Gaps.Outer {
-    parseTable(raw, Gaps.Outer.zero, outerParser, backtrace, &errors)
+func parseOuter(_ raw: OrderedJson, _ backtrace: ConfigBacktrace, _ c: inout ConfigParserContext) -> Gaps.Outer {
+    parseTable(raw, Gaps.Outer.zero, outerParser, backtrace, &c)
 }

@@ -73,9 +73,9 @@ The following commands focus next or previous workspaces on monitors where the m
 
 [source,bash]
 ----
-aerospace workspace "$(aerospace list-workspaces --monitor mouse --visible)" && aerospace workspace next
+aerospace eval 'list-workspaces --monitor mouse --visible | workspace --stdin next; workspace next --wrap-around'
 
-aerospace workspace "$(aerospace list-workspaces --monitor mouse --visible)" && aerospace workspace prev
+aerospace eval 'list-workspaces --monitor mouse --visible | workspace --stdin next; workspace prev --wrap-around'
 ----
 
 Use the software of your choice to assign trackpad gestures to the respective commands.
@@ -189,12 +189,8 @@ end tell'
 +
 [source,toml]
 ----
-ctrl-g = '''exec-and-forget osascript -e '
-tell application "Terminal"
-    do script
-    activate
-end tell'
-'''
+ctrl-g = '''exec-and-forget osascript -e \
+'tell application "Terminal" to tell (do script) to activate' '''
 ----
 - Ghostty
 +
@@ -250,7 +246,7 @@ link:https://github.com/magicmark/spacelist[Spacelist] is a terminal UI applicat
 [#popular-apps-ids]
 == List of Apple application IDs
 
-The list is useful to compose custom xref:guide.adoc#on-window-detected-callback[on-window-detected callback].
+The list is useful to compose custom xref:./guide.adoc#on-window-detected-callback[on-window-detected callback].
 
 [cols="1,3"]
 |===

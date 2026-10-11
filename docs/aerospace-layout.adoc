@@ -2,15 +2,16 @@
 include::util/man-attributes.adoc[]
 :manname: aerospace-layout
 // tag::purpose[]
-:manpurpose: Change layout of the focused window to the given layout
+:manpurpose: Change layout of the focused node to the given layout
 // end::purpose[]
 
 // =========================================================== Synopsis
 == Synopsis
 [verse]
 // tag::synopsis[]
-aerospace layout [-h|--help] [--window-id <window-id>]
-                 (h_tiles|v_tiles|h_accordion|v_accordion|tiles|accordion|horizontal|vertical|tiling|floating)...
+aerospace layout [-h|--help] [--window-id <window-id>|--workspace <workspace>]
+                 [--root] [--fail-if-noop]
+                 (<target-layout>)...
 
 // end::synopsis[]
 
@@ -20,13 +21,6 @@ aerospace layout [-h|--help] [--window-id <window-id>]
 // tag::body[]
 {manpurpose}
 
-If several arguments are supplied then finds the first argument that doesn't describe the currently active layout, and applies the layout.
-
-* Change both tiling layout and orientation in one go: `h_tiles|v_tiles|h_accordion|v_accordion`
-* Change tiling layout but preserve orientation: `tiles|accordion`
-* Change orientation but preserve layout: `horizontal|vertical`
-* Toggle floating/tiling mode: `tiling|floating`
-
 // =========================================================== Options
 include::./util/conditional-options-header.adoc[]
 
@@ -35,8 +29,32 @@ include::./util/conditional-options-header.adoc[]
 --window-id <window-id>::
 include::./util/window-id-flag-desc.adoc[]
 
+--workspace <workspace>::
+include::./util/workspace-flag-desc.adoc[]
+
+--root::
+Instead of the focused window, change the layout of the workspace tiling root node.
+When you use this flag, `tiling` and `floating` become invalid values for `<target-layout>`.
+
+--fail-if-noop::
+Exit with non-zero exit code if already in the requested layout.
+When you use this flag, the command permits only one `<target-layout>` argument.
+
+// =========================================================== Arguments
+include::./util/conditional-arguments-header.adoc[]
+
+<target-layout>::
+Possible values:
++
+* `h_tiles|v_tiles|h_accordion|v_accordion` - Change both tiling layout and orientation in one go
+* `tiles|accordion` - Change tiling layout but preserve orientation
+* `horizontal|vertical` - Change orientation but preserve layout
+* `tiling|floating` - Toggle between floating/tiling mode
++
+If several `<target-layout>` are supplied, then the first one that doesn't describe the currently active layout is applied.
+
 // =========================================================== Examples
-include::util/conditional-examples-header.adoc[]
+include::./util/conditional-examples-header.adoc[]
 
 * Toggle between `floating` and `tiling` layouts (order of args doesn't matter): +
 `aerospace layout floating tiling`
@@ -53,4 +71,4 @@ include::util/conditional-examples-header.adoc[]
 // end::body[]
 
 // =========================================================== Footer
-include::util/man-footer.adoc[]
+include::./util/man-footer.adoc[]

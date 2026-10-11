@@ -7,7 +7,6 @@ public struct ListWindowsCmdArgs: CmdArgs {
     /*conforms*/ public var commonState: CmdArgsCommonState
     public static let parser: CmdParser<Self> = .init(
         kind: .listWindows,
-        allowInConfig: false,
         help: list_windows_help_generated,
         flags: [
             "--all": trueBoolFlag(\.allAlias),
@@ -16,7 +15,7 @@ public struct ListWindowsCmdArgs: CmdArgs {
             "--focused": trueBoolFlag(\.filteringOptions.focused),
             "--monitor": ArgParser(\.filteringOptions.monitors, parseMonitorIds),
             "--workspace": ArgParser(\.filteringOptions.workspaces, parseWorkspaces),
-            "--pid": singleValueSubArgParser(\.filteringOptions.pidFilter, "<pid>") { Int32($0).orFailure("Can't convert to Int32") },
+            "--pid": singleValueSubArgParser(\.filteringOptions.pidFilter, "<pid>") { Int32($0).toResult("Can't convert to Int32") },
             "--app-bundle-id": singleValueSubArgParser(\.filteringOptions.appIdFilter, "<app-bundle-id>", Result.success),
 
             // Formatting flags
@@ -36,11 +35,11 @@ public struct ListWindowsCmdArgs: CmdArgs {
     fileprivate var allAlias: Bool = false
 
     public var filteringOptions = FilteringOptions()
-    public var _format: [StringInterToken] = []
+    public var _format: [InterToken<InterVar>] = []
     public var outputOnlyCount: Bool = false
     public var json: Bool = false
 
-    public struct FilteringOptions: ConvenienceCopyable, Equatable, Sendable {
+    public struct FilteringOptions: ConvenienceMutable, Equatable, Sendable {
         public var monitors: [MonitorId] = []
         public var focused: Bool = false
         public var workspaces: [WorkspaceFilter] = []
@@ -50,12 +49,12 @@ public struct ListWindowsCmdArgs: CmdArgs {
 }
 
 extension ListWindowsCmdArgs {
-    public var format: [StringInterToken] {
+    public var format: [InterToken<InterVar>] {
         _format.isEmpty
             ? [
-                .interVar("window-id"), .interVar("right-padding"), .literal(" | "),
-                .interVar("app-name"), .interVar("right-padding"), .literal(" | "),
-                .interVar("window-title"),
+                .interVar(.formatVar(.window(.windowId))), .interVar(.plainInterVar(.rightPadding)), .literal(" | "),
+                .interVar(.formatVar(.app(.appName))), .interVar(.plainInterVar(.rightPadding)), .literal(" | "),
+                .interVar(.formatVar(.window(.windowTitle))),
             ]
             : _format
     }
@@ -80,12 +79,12 @@ func parseListWindowsCmdArgs(_ args: StrArrSlice) -> ParsedCmd<ListWindowsCmdArg
 }
 
 func formatParser<Root>(
-    _ keyPath: SendableWritableKeyPath<Root, [StringInterToken]>,
+    _ keyPath: SendableWritableKeyPath<Root, [InterToken<InterVar>]>,
     for kind: AeroObjKind,
-) -> SubArgParser<Root, [StringInterToken]> {
+) -> SubArgParser<Root, [InterToken<InterVar>]> {
     return ArgParser(keyPath) { input in
         if let arg = input.nonFlagArgOrNil() {
-            return switch arg.interpolationTokens(interpolationChar: "%") {
+            return switch arg.interpolationTokens(interpolationChar: "%", ofInterVarType: InterVar.self) {
                 case .success(let tokens): .succ(tokens, advanceBy: 1)
                 case .failure(let err): .fail("Failed to parse <output-format>. \(err)", advanceBy: 1)
             }
@@ -130,6 +129,16 @@ public enum FormatVar: RawRepresentable, Equatable, CaseIterable, Sendable {
     case workspace(WorkspaceFormatVar)
     case app(AppFormatVar)
     case monitor(MonitorFormatVar)
+
+    // periphery:ignore
+    private var kind: AeroObjKind {
+        switch self {
+            case .app: .app
+            case .monitor: .monitor
+            case .window: .window
+            case .workspace: .workspace
+        }
+    }
 
     public static var allCases: [FormatVar] {
         AeroObjKind.allCases.flatMap {
@@ -204,18 +213,56 @@ public enum PlainInterVar: String, CaseIterable, Sendable, Equatable {
     case tab = "tab"
 }
 
-public enum AeroObjKind: CaseIterable, Sendable {
-    case window, workspace, app, monitor
+public enum InterVar: RawRepresentable, Equatable, CaseIterable, Sendable {
+    case formatVar(FormatVar)
+    case plainInterVar(PlainInterVar)
+
+    private enum Kind: CaseIterable, Equatable, Sendable {
+        case formatVar
+        case plainInterVar
+    }
 
     // periphery:ignore
-    private static func unused(_ it: FormatVar) -> Self {
-        switch it {
-            case .app: .app
-            case .monitor: .monitor
-            case .window: .window
-            case .workspace: .workspace
+    private var kind: Kind {
+        switch self {
+            case .formatVar: .formatVar
+            case .plainInterVar: .plainInterVar
         }
     }
+
+    public static var allCases: [InterVar] {
+        Kind.allCases.flatMap { kind in
+            switch kind {
+                case .formatVar: FormatVar.allCases.map(InterVar.formatVar)
+                case .plainInterVar: PlainInterVar.allCases.map(InterVar.plainInterVar)
+            }
+        }
+    }
+
+    public init?(rawValue: String) {
+        let this: [Self] = Kind.allCases.map { kind in
+            switch kind {
+                case .formatVar: FormatVar(rawValue: rawValue).map(InterVar.formatVar)
+                case .plainInterVar: PlainInterVar(rawValue: rawValue).map(InterVar.plainInterVar)
+            }
+        }.filterNotNil()
+        switch this.sequencePattern {
+            case .empty: return nil
+            case .one(let it): self = it
+            default: die("Clashed cases: \(this)")
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+            case .formatVar(let it): it.rawValue
+            case .plainInterVar(let it): it.rawValue
+        }
+    }
+}
+
+public enum AeroObjKind: CaseIterable, Sendable {
+    case window, workspace, app, monitor
 }
 
 public func getAvailableInterVars(for kind: AeroObjKind) -> [String] {

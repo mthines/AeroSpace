@@ -8,7 +8,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Defaults
 
     func testDefaultValues() {
-        let (config, errors) = parseConfig("")
+        let (config, errors) = parseOverviewTestConfig("")
         assertEquals(errors, [])
         let ov = config.overview
         XCTAssertNil(ov.workspaces)
@@ -23,7 +23,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Workspaces allowlist
 
     func testWorkspacesAllowlist() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             workspaces = ['1', '2', '3']
@@ -35,7 +35,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testEmptyWorkspacesAllowlist() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             workspaces = []
@@ -48,7 +48,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Exclude workspaces denylist
 
     func testExcludeWorkspaces() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             exclude-workspaces = ['9']
@@ -62,7 +62,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Mutual exclusion error
 
     func testWorkspacesAndExcludeWorkspacesMutuallyExclusive() {
-        let (_, errors) = parseConfig(
+        let (_, errors) = parseOverviewTestConfig(
             """
             [overview]
             workspaces = ['1', '2']
@@ -78,7 +78,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Columns
 
     func testColumnsAuto() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             columns = 'auto'
@@ -89,7 +89,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testColumnsFixed() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             columns = 3
@@ -100,7 +100,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testColumnsNegativeError() {
-        let (_, errors) = parseConfig(
+        let (_, errors) = parseOverviewTestConfig(
             """
             [overview]
             columns = -1
@@ -110,7 +110,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testColumnsZeroError() {
-        let (_, errors) = parseConfig(
+        let (_, errors) = parseOverviewTestConfig(
             """
             [overview]
             columns = 0
@@ -120,7 +120,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testColumnsInvalidStringError() {
-        let (_, errors) = parseConfig(
+        let (_, errors) = parseOverviewTestConfig(
             """
             [overview]
             columns = 'invalid'
@@ -132,7 +132,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Cell label
 
     func testCellLabelWorkspaceName() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             cell-label = 'workspace-name'
@@ -143,7 +143,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testCellLabelAppList() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             cell-label = 'app-list'
@@ -154,7 +154,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testCellLabelBoth() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             cell-label = 'both'
@@ -165,7 +165,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testCellLabelInvalidError() {
-        let (_, errors) = parseConfig(
+        let (_, errors) = parseOverviewTestConfig(
             """
             [overview]
             cell-label = 'screenshot'
@@ -177,7 +177,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Dim settings
 
     func testDimBackgroundFalse() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             dim-background = false
@@ -188,7 +188,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testDimOpacityInteger() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             dim-opacity = 40
@@ -199,7 +199,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testDimOpacityZero() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             dim-opacity = 0
@@ -210,7 +210,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testDimOpacity100() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             dim-opacity = 100
@@ -221,7 +221,7 @@ final class OverviewConfigTest: XCTestCase {
     }
 
     func testDimOpacityOutOfRangeError() {
-        let (_, errors) = parseConfig(
+        let (_, errors) = parseOverviewTestConfig(
             """
             [overview]
             dim-opacity = 101
@@ -233,7 +233,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - All keys together
 
     func testAllKeysValid() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [overview]
             workspaces = ['1', '2']
@@ -254,7 +254,7 @@ final class OverviewConfigTest: XCTestCase {
     // MARK: - Overview command in hotkey binding
 
     func testOverviewCommandInHotkeyBinding() {
-        let (config, errors) = parseConfig(
+        let (config, errors) = parseOverviewTestConfig(
             """
             [mode.main.binding]
             ctrl-alt-o = 'overview'
@@ -263,8 +263,15 @@ final class OverviewConfigTest: XCTestCase {
         assertEquals(errors, [])
         let modeBindings = config.modes[mainModeId]?.bindings ?? [:]
         let hasOverview = modeBindings.values.contains(where: {
-            $0.commands.contains(where: { $0 is OverviewCommand })
+            $0.commands.flatten().contains(where: { $0 is OverviewCommand })
         })
         XCTAssertTrue(hasOverview, "Expected overview command in hotkey binding")
     }
+}
+
+/// `parseConfig` result as (config, error messages) — the shape these tests are written against.
+@MainActor
+private func parseOverviewTestConfig(_ toml: String) -> (Config, [String]) {
+    let result = parseConfig(toml)
+    return (result.config, result.strErrors)
 }

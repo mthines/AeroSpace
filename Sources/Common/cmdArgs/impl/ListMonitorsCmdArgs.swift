@@ -3,7 +3,6 @@ public struct ListMonitorsCmdArgs: CmdArgs {
     public init(rawArgs: StrArrSlice) { self.commonState = .init(rawArgs) }
     public static let parser: CmdParser<Self> = .init(
         kind: .listMonitors,
-        allowInConfig: false,
         help: list_monitors_help_generated,
         flags: [
             "--focused": boolFlag(\.focused),
@@ -23,17 +22,17 @@ public struct ListMonitorsCmdArgs: CmdArgs {
 
     public var focused: Bool?
     public var mouse: Bool?
-    public var _format: [StringInterToken] = []
+    public var _format: [InterToken<InterVar>] = []
     public var outputOnlyCount: Bool = false
     public var json: Bool = false
 }
 
 extension ListMonitorsCmdArgs {
-    public var format: [StringInterToken] {
+    public var format: [InterToken<InterVar>] {
         _format.isEmpty
             ? [
-                .interVar("monitor-id"), .interVar("right-padding"), .literal(" | "),
-                .interVar("monitor-name"),
+                .interVar(.formatVar(.monitor(.monitorId_oneBased))), .interVar(.plainInterVar(.rightPadding)), .literal(" | "),
+                .interVar(.formatVar(.monitor(.monitorName))),
             ]
             : _format
     }

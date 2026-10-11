@@ -13,9 +13,9 @@ struct SplitCommand: Command {
         guard let window = target.windowOrNil else {
             return .fail(io.err(noWindowIsFocused))
         }
-        guard let parent = window.parent else { return .fail }
+        guard let parent = window.parent else { return .fail(io.err(bugPrompt())) }
         switch parent.cases {
-            case .workspace:
+            case .floatingWindowsContainer:
                 // Nothing to do for floating and macOS native fullscreen windows
                 return .fail(io.err("Can't split floating windows"))
             case .tilingContainer(let parent):
@@ -40,8 +40,8 @@ struct SplitCommand: Command {
                 return .succ
             case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer, .macosHiddenAppsWindowsContainer:
                 return .fail(io.err("Can't split macos fullscreen, minimized windows and windows of hidden apps. This behavior may change in the future"))
-            case .macosPopupWindowsContainer:
-                return .fail // Impossible
+            case .macosPopupWindowsContainer, .workspace:
+                return .fail(io.err(bugPrompt())) // Impossible
         }
     }
 }

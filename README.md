@@ -93,7 +93,7 @@ What stops us from 1.0 release:
   Important for: stability and potential performance
   - [ ] https://github.com/nikitabobko/AeroSpace/issues/1216 The big refactoring will help us to fix stability issue that windows may randomly jump to the focused workspace
   - [ ] https://github.com/nikitabobko/AeroSpace/issues/68 The big refactoring will help us to support macOS native tabs
-- [ ] https://github.com/nikitabobko/AeroSpace/issues/278 Implement shell-like combinators.
+- [x] https://github.com/nikitabobko/AeroSpace/issues/278 Implement shell-like combinators.
   Ignore a lot of crazy fuss in the issue,
   We are most probably going with the minimal approach to only introduce common shell-combinators: `||`, `&&`, `;` and `eval` command to send multiple commands in one go.
 - [ ] https://github.com/nikitabobko/AeroSpace/issues/1012 Investigate a possibility to use `CGEvent.tapCreate` API for global hotkeys
@@ -136,13 +136,11 @@ A notes on how to setup the project, build it, how to run the tests, etc. can be
   Ricing issues are not a priority, and they are mostly ignored.
   The ricing stance can change only with the appearance of more maintainers.
 
-## macOS compatibility table
+## macOS compatibility
 
-|                                                                                | macOS 13 (Ventura) | macOS 14 (Sonoma) | macOS 15 (Sequoia) | macOS 26 (Tahoe) |
-| ------------------------------------------------------------------------------ | ------------------ | ----------------- | ------------------ | ---------------- |
-| AeroSpace binary runs on ...                                                   | +                  | +                 | +                  | +                |
-| AeroSpace debug build from sources is supported on ...                         |                    | +                 | +                  | +                |
-| AeroSpace release build from sources is supported on ... (Requires Xcode 26+)  |                    |                   | +                  | +                |
+* AeroSpace binary runs on: macOS 13+
+* AeroSpace debug build from sources is supported on: macOS 14+
+* AeroSpace release build from sources is supported on: macOS 15+ (Requires: Swift 6.4, Xcode 26.6+)
 
 ## Sponsorship
 
@@ -169,5 +167,14 @@ Source: [reddit](https://www.reddit.com/r/MacOS/comments/k6hiwk/keyboard_modifie
 
 ## Related projects
 
-- [Amethyst](https://github.com/ianyh/Amethyst)
-- [yabai](https://github.com/koekeishiya/yabai)
+In alphabetical order:
+
+- [Amethyst](https://github.com/ianyh/Amethyst) -
+  Beginners friendly GUI-configurable tiling window manager with automatic layouts à la xmonad.
+- [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher) -
+  Instant space switching by synthesizing trackpad gesture with an artificially high velocity.
+- [rift](https://github.com/acsandmann/rift) -
+  Virtual workspaces + private APIs.
+- [yabai](https://github.com/koekeishiya/yabai) -
+  A window manager that provides tight integration with native macOS Spaces and goes all the way to private APIs and code injection.
+  yabai is a source of inspiration for a lot of other OSS projects.

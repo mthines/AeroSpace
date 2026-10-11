@@ -106,7 +106,7 @@ extension AxUiElementMock {
     ) -> Bool {
         if windowLevel != .normalWindow &&
             // Slowly roll out windowLevel for applications for which we have the appropriate dumps
-            (id == .slack || id == .chrome || id?.isFirefox == true || id == .braveBrowser || id == .screenstudio || id == .cleanshotx || id == .iterm2)
+            (id == .slack || id == .chrome || id?.isFirefox == true || id == .braveBrowser || id == .screenstudio || id == .cleanshotx || id == .iterm2 || id == .outlook || id == .codex || id == .wisprFlow)
         {
             return false
         }
@@ -130,6 +130,13 @@ extension AxUiElementMock {
         }
 
         if activationPolicy == .accessory && get(Ax.closeButtonAttr) == nil && id != .steam {
+            return false
+        }
+
+        // Emacs child frames (posframes, corfu completion popups, etc.)
+        // These are transient UI elements that should not be managed as windows.
+        // https://github.com/nikitabobko/AeroSpace/issues/776
+        if id == .emacs && get(Ax.subroleAttr) == kAXFloatingWindowSubrole {
             return false
         }
 

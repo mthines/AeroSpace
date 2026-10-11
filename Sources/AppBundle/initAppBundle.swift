@@ -3,29 +3,20 @@ import Common
 import Foundation
 
 @MainActor public func initAppBundle() {
-    Task {
+    Task.startUnstructured {
         initTerminationHandler()
         unsafe _isCli = false
         initServerArgs()
+        await waitForAccessibilityPermission_nonCancellable()
         if isDebug {
             await toggleReleaseServerIfDebug(.off)
             interceptTermination(SIGINT)
             interceptTermination(SIGKILL)
         }
-        if try await !reloadConfig() {
-            var out = ""
-            check(
-                try await reloadConfig(forceConfigUrl: defaultConfigUrl, stdout: &out),
-                """
-                Can't load default config. Your installation is probably corrupted.
-                Please don't modify \(defaultConfigUrl.description.singleQuoted)
 
-                \(out)
-                """,
-            )
-        }
+        await bootstrapConfig_nonCancellable()
+        _ = await reloadConfig_nonCancellable()
 
-        checkAccessibilityPermissions()
         startUnixSocketServer()
         GlobalObserver.initObserver()
         Workspace.garbageCollectUnusedWorkspaces() // init workspaces
@@ -33,15 +24,26 @@ import Foundation
         await runHeavyCompleteRefreshSession(
             .startup,
             // It's important for the first initialization to be non cancellable
-            // to make sure that isStartup propagates // to all places
-            cancellable: false,
+            // to make sure that isStartup propagates to all places
+            assumeCancellable: false,
             layoutWorkspaces: false,
         )
         try await runLightSession(.startup, .forceRun) {
             smartLayoutAtStartup()
-            _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
+            _ = await config.afterStartupCommand.run(.defaultEnv, .emptyStdin)
         }
     }
+}
+
+@MainActor private func bootstrapConfig_nonCancellable() async {
+    let result = await reloadConfig_nonCancellable(forceConfigUrl: defaultConfigUrl)
+    let msg = """
+        Can't load default config. Your installation is probably corrupted.
+        Please don't modify \(defaultConfigUrl.description.singleQuoted)
+
+        \(result.stdout)
+        """
+    check(result.isOk, msg)
 }
 
 @MainActor
@@ -54,9 +56,7 @@ private func smartLayoutAtStartup() {
     }
 }
 
-@TaskLocal
-var _isStartup: Bool? = false
-var isStartup: Bool { _isStartup ?? dieT("isStartup is not initialized") }
+var isStartup: Bool { refreshSessionEvent?.isStartup == true }
 
 struct ServerArgs: Sendable {
     var configLocation: String? = nil

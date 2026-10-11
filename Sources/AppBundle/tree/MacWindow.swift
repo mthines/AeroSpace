@@ -18,14 +18,15 @@ final class MacWindow: Window {
     @discardableResult
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow {
         if let existing = allWindowsMap[windowId] { return existing }
-        let rect = try await macApp.getAxRect(windowId)
+        let rect = try await macApp.getAxRect(windowId, .cancellable)
         let data = try await unbindAndGetBindingDataForNewWindow(
             windowId,
             macApp,
             isStartup
-                ? (rect?.center.monitorApproximation ?? mainMonitor).activeWorkspace
+                ? (rect?.center.monitorApproximation ?? mainMonitorInfo).activeWorkspace
                 : focus.workspace,
             window: nil,
+            .cancellable,
         )
 
         // atomic synchronous section
@@ -33,9 +34,9 @@ final class MacWindow: Window {
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         allWindowsMap[windowId] = window
 
-        try await debugWindowsIfRecording(window)
+        try await debugWindowsIfRecording(window, .cancellable)
         if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
-            try await tryOnWindowDetected(window)
+            await tryOnWindowDetected(window)
         }
         return window
     }
@@ -52,16 +53,16 @@ final class MacWindow: Window {
     //     return "Window(\(description))"
     // }
 
-    func isWindowHeuristic(_ windowLevel: MacOsWindowLevel?) async throws -> Bool { // todo cache
-        try await macApp.isWindowHeuristic(windowId, windowLevel)
+    func isWindowHeuristic(_ windowLevel: MacOsWindowLevel?, _ cm: CancellationMode) async throws -> Bool { // todo cache
+        try await macApp.isWindowHeuristic(windowId, windowLevel, cm)
     }
 
-    func isDialogHeuristic(_ windowLevel: MacOsWindowLevel?) async throws -> Bool { // todo cache
-        try await macApp.isDialogHeuristic(windowId, windowLevel)
+    func isDialogHeuristic(_ windowLevel: MacOsWindowLevel?, _ cm: CancellationMode) async throws -> Bool { // todo cache
+        try await macApp.isDialogHeuristic(windowId, windowLevel, cm)
     }
 
-    func dumpAxInfo() async throws -> [String: Json] {
-        try await macApp.dumpWindowAxInfo(windowId: windowId)
+    func dumpAxInfo(_ cm: CancellationMode) async throws -> [String: Json] {
+        try await macApp.dumpWindowAxInfo(windowId: windowId, cm)
     }
 
     func setNativeFullscreen(_ value: Bool) {
@@ -87,7 +88,7 @@ final class MacWindow: Window {
             deadWindowWorkspace == prevFocusedWorkspace && prevFocusedWorkspaceDate.distance(to: .now) < 1
         {
             switch parent.cases {
-                case .tilingContainer, .workspace, .macosHiddenAppsWindowsContainer, .macosFullscreenWindowsContainer:
+                case .tilingContainer, .floatingWindowsContainer, .macosHiddenAppsWindowsContainer, .macosFullscreenWindowsContainer:
                     let deadWindowFocus = deadWindowWorkspace.toLiveFocus()
                     _ = setFocus(to: deadWindowFocus)
                     // Guard against "Apple Reminders popup" bug: https://github.com/nikitabobko/AeroSpace/issues/201
@@ -96,18 +97,19 @@ final class MacWindow: Window {
                         //   https://github.com/nikitabobko/AeroSpace/issues/65
                         deadWindowFocus.windowOrNil?.nativeFocus()
                     }
-                case .macosPopupWindowsContainer, .macosMinimizedWindowsContainer:
-                    break // Don't switch back on popup destruction
+                case .macosPopupWindowsContainer, // Don't switch back on popup destruction
+                     .workspace, // Workspace is invalid parent for windows
+                     .macosMinimizedWindowsContainer: // Don't switch back on minimized windows destruction
+                    break
             }
         }
     }
 
-    @MainActor override var title: String { get async throws { try await macApp.getAxTitle(windowId) ?? "" } }
-    @MainActor override var isMacosFullscreen: Bool { get async throws { try await macApp.isMacosNativeFullscreen(windowId) == true } }
-    @MainActor override var isMacosMinimized: Bool { get async throws { try await macApp.isMacosNativeMinimized(windowId) == true } }
+    override func getTitle(_ cm: CancellationMode) async throws -> String { try await macApp.getAxTitle(windowId, cm) ?? "" }
+    override func isMacosFullscreen(_ cm: CancellationMode) async throws -> Bool { try await macApp.isMacosNativeFullscreen(windowId, cm) == true }
+    override func isMacosMinimized(_ cm: CancellationMode) async throws -> Bool { try await macApp.isMacosNativeMinimized(windowId, cm) == true }
 
-    @MainActor
-    override func nativeFocus() {
+    @MainActor override func nativeFocus() {
         macApp.nativeFocus(windowId)
     }
 
@@ -122,7 +124,7 @@ final class MacWindow: Window {
         guard let nodeMonitor else { return }
         // Don't accidentally override prevUnhiddenEmulationPosition in case of subsequent `hideInCorner` calls
         if !isHiddenInCorner {
-            guard let windowRect = try await getAxRect() else { return }
+            guard let windowRect = try await getAxRect(.cancellable) else { return }
             // Check for isHiddenInCorner for the second time because of the suspension point above
             if !isHiddenInCorner {
                 let topLeftCorner = windowRect.topLeftCorner
@@ -130,12 +132,15 @@ final class MacWindow: Window {
                 let absolutePoint = topLeftCorner - monitorRect.topLeftCorner
                 prevUnhiddenProportionalPositionInsideWorkspaceRect =
                     CGPoint(x: absolutePoint.x / monitorRect.width, y: absolutePoint.y / monitorRect.height)
+                if isFloating {
+                    lastFloatingSize = windowRect.size
+                }
             }
         }
         let p: CGPoint
         switch corner {
             case .bottomLeftCorner:
-                guard let s = try await getAxSize() else { fallthrough }
+                guard let s = try await getAxSize(.cancellable) else { fallthrough }
                 // Zoom will jump off if you do one pixel offset https://github.com/nikitabobko/AeroSpace/issues/527
                 // todo this ad hoc won't be necessary once I implement optimization suggested by Zalim
                 let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: -1)
@@ -181,40 +186,42 @@ final class MacWindow: Window {
         prevUnhiddenProportionalPositionInsideWorkspaceRect != nil
     }
 
-    override func getAxSize() async throws -> CGSize? {
-        try await macApp.getAxSize(windowId)
+    override func getAxSize(_ cm: CancellationMode) async throws -> CGSize? {
+        try await macApp.getAxSize(windowId, cm)
     }
 
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
         macApp.setAxFrame(windowId, topLeft, size)
     }
 
+    /// Awaitable `setAxFrame`; see `MacApp.setAxFrameBlocking`. Non-cancellable so the overview's
+    /// moves into and out of its grid always complete.
     func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?) async throws {
-        try await macApp.setAxFrameBlocking(windowId, topLeft, size)
+        try await macApp.setAxFrameBlocking(windowId, topLeft, size, .nonCancellable)
     }
 
-    override func getAxRect() async throws -> Rect? {
-        try await macApp.getAxRect(windowId)
+    override func getAxRect(_ cm: CancellationMode) async throws -> Rect? {
+        try await macApp.getAxRect(windowId, cm)
     }
 }
 
 extension Window {
     @MainActor
-    func relayoutWindow(on workspace: Workspace, forceTile: Bool = false) async throws {
+    func relayoutWindow(on workspace: Workspace, _ cm: CancellationMode, forceTile: Bool = false) async throws {
         let data = forceTile
             ? unbindAndGetBindingDataForNewTilingWindow(workspace, window: self)
-            : try await unbindAndGetBindingDataForNewWindow(self.asMacWindow().windowId, self.asMacWindow().macApp, workspace, window: self)
+            : try await unbindAndGetBindingDataForNewWindow(self.asMacWindow().windowId, self.asMacWindow().macApp, workspace, window: self, cm)
         bind(to: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
     }
 }
 
 // The function is private because it's unsafe. It leaves the window in unbound state
 @MainActor
-private func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?) async throws -> BindingData {
+private func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?, _ cm: CancellationMode) async throws -> BindingData {
     let windowLevel = getWindowLevel(for: windowId)
-    return switch try await macApp.getAxUiElementWindowType(windowId, windowLevel) {
+    return switch try await macApp.getAxUiElementWindowType(windowId, windowLevel, cm) {
         case .popup: BindingData(parent: macosPopupWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        case .dialog: BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        case .dialog: BindingData(parent: workspace.floatingWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         case .window: unbindAndGetBindingDataForNewTilingWindow(workspace, window: window)
     }
 }
@@ -240,51 +247,57 @@ private func unbindAndGetBindingDataForNewTilingWindow(_ workspace: Workspace, w
 }
 
 @MainActor
-func tryOnWindowDetected(_ window: Window) async throws {
-    guard let parent = window.parent else { return }
-    switch parent.cases {
-        case .tilingContainer, .workspace, .macosMinimizedWindowsContainer,
+func tryOnWindowDetected(_ window: Window) async {
+    switch window.windowParentCases {
+        case .tilingContainer, .floatingWindowsContainer, .macosMinimizedWindowsContainer,
              .macosFullscreenWindowsContainer, .macosHiddenAppsWindowsContainer:
-            try await onWindowDetected(window)
-        case .macosPopupWindowsContainer:
+            _ = await onWindowDetected(.defaultEnv, CmdIoImpl.emptyStdinIgnoringOut, window)
+        case .macosPopupWindowsContainer, .unbound:
             break
     }
 }
 
 @MainActor
-private func onWindowDetected(_ window: Window) async throws {
+func onWindowDetected(_ env: CmdEnv, _ io: CmdIo, _ window: Window) async -> Int32ExitCode {
     broadcastEvent(.windowDetected(
         windowId: window.windowId,
         workspace: window.nodeWorkspace?.name,
         appBundleId: window.app.rawAppBundleId,
         appName: window.app.name,
     ))
-    for callback in config.onWindowDetected where try await callback.matches(window) {
-        _ = try await callback.run.runCmdSeq(.defaultEnv.copy(\.windowId, window.windowId), .emptyStdin)
+    var lastExitCode = Int32ExitCode.succ
+    for callback in config.onWindowDetected where await callback.matches(window) {
+        lastExitCode = await callback.run.run(env.withWindowId(window.windowId), io)
         if !callback.checkFurtherCallbacks {
-            return
+            return lastExitCode
         }
     }
+    return lastExitCode
 }
 
 extension WindowDetectedCallback {
     @MainActor
-    func matches(_ window: Window) async throws -> Bool {
-        if let startupMatcher = matcher.duringAeroSpaceStartup, startupMatcher != isStartup {
-            return false
+    func matches(_ window: Window) async -> Bool {
+        switch self.matcher {
+            case .legacy(let matcher):
+                if let startupMatcher = matcher.duringAeroSpaceStartup, startupMatcher != isStartup {
+                    return false
+                }
+                if let regex = matcher.windowTitleRegexSubstring, (try? await window.getTitle(.nonCancellable))?.contains(caseInsensitiveRegex: regex) != true {
+                    return false
+                }
+                if let appId = matcher.appId, appId != window.app.rawAppBundleId {
+                    return false
+                }
+                if let regex = matcher.appNameRegexSubstring, !(window.app.name ?? "").contains(caseInsensitiveRegex: regex) {
+                    return false
+                }
+                if let workspace = matcher.workspace, workspace != window.nodeWorkspace?.name {
+                    return false
+                }
+                return true
+            case .command(let command):
+                return await command.run(.defaultEnv.withWindowId(window.windowId), .emptyStdin).exitCode.rawValue == 0
         }
-        if let regex = matcher.windowTitleRegexSubstring, !(try await window.title).contains(caseInsensitiveRegex: regex) {
-            return false
-        }
-        if let appId = matcher.appId, appId != window.app.rawAppBundleId {
-            return false
-        }
-        if let regex = matcher.appNameRegexSubstring, !(window.app.name ?? "").contains(caseInsensitiveRegex: regex) {
-            return false
-        }
-        if let workspace = matcher.workspace, workspace != window.nodeWorkspace?.name {
-            return false
-        }
-        return true
     }
 }

@@ -3,7 +3,6 @@ public struct OverviewCmdArgs: CmdArgs {
     fileprivate init(rawArgs: StrArrSlice) { self.commonState = .init(rawArgs) }
     public static let parser: CmdParser<Self> = .init(
         kind: .overview,
-        allowInConfig: true,
         help: overview_help_generated,
         flags: [
             "--windows": trueBoolFlag(\.windows),

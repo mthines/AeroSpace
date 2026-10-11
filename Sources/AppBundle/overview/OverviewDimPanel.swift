@@ -30,7 +30,7 @@ import Common
 /// (bottom-left origin, Y-up) for use with NSWindow.setFrame.
 /// Uses the main screen height as the flip axis (same convention as NSScreen.rect).
 @MainActor func toAppKitFrame(_ rect: Rect) -> NSRect {
-    let screenH = mainMonitor.height
+    let screenH = mainMonitorInfo.height
     // AppKit minY = screenH - (aerospaceTopLeftY + height)
     let appKitY = screenH - rect.topLeftY - rect.height
     return NSRect(x: rect.topLeftX, y: appKitY, width: rect.width, height: rect.height)

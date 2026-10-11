@@ -19,10 +19,16 @@ let config_help_generated = """
 let debug_windows_help_generated = """
     USAGE: debug-windows [-h|--help] [--window-id <window-id>]
     """
+let echo_help_generated = """
+    USAGE: echo [-h|--help] [--stderr] [--window-id <window-id>] -- <string>...
+    """
 let enable_help_generated = """
     USAGE: enable [-h|--help] toggle
        OR: enable [-h|--help] on [--fail-if-noop]
        OR: enable [-h|--help] off [--fail-if-noop]
+    """
+let eval_help_generated = """
+    USAGE: eval [-h|--help] [--stdin] [--] <aerospace-shell-expr>
     """
 let exec_and_forget_help_generated = """
     USAGE: exec-and-forget <bash-script>
@@ -39,11 +45,12 @@ let focus_back_and_forth_help_generated = """
 let focus_monitor_help_generated = """
     USAGE: focus-monitor [-h|--help] [--wrap-around] (left|down|up|right)
        OR: focus-monitor [-h|--help] [--wrap-around] (next|prev)
-       OR: focus-monitor [-h|--help] <monitor-pattern>...
+       OR: focus-monitor [-h|--help] [--] <monitor-pattern>...
     """
 let focus_help_generated = """
     USAGE: focus [-h|--help] [--ignore-floating] [--wrap-around]
                  [--boundaries <boundary>] [--boundaries-action <action>]
+                 [--fail-if-fullscreen] [--fail-if-macos-native-fullscreen]
                  (left|down|up|right)
        OR: focus [-h|--help] [--ignore-floating] [--wrap-around]
                  [--boundaries <boundary>] [--boundaries-action <action>]
@@ -60,8 +67,9 @@ let join_with_help_generated = """
     USAGE: join-with [-h|--help] [--window-id <window-id>] (left|down|up|right)
     """
 let layout_help_generated = """
-    USAGE: layout [-h|--help] [--window-id <window-id>]
-                  (h_tiles|v_tiles|h_accordion|v_accordion|tiles|accordion|horizontal|vertical|tiling|floating)...
+    USAGE: layout [-h|--help] [--window-id <window-id>|--workspace <workspace>]
+                  [--root] [--fail-if-noop]
+                  (<target-layout>)...
     """
 let list_apps_help_generated = """
     USAGE: list-apps [-h|--help] [--macos-native-hidden [no]] [--format <output-format>] [--count] [--json]
@@ -97,7 +105,7 @@ let macos_native_minimize_help_generated = """
     USAGE: macos-native-minimize [-h|--help] [--window-id <window-id>]
     """
 let mode_help_generated = """
-    USAGE: mode [-h|--help] <binding-mode>
+    USAGE: mode [-h|--help] [--] <binding-mode>
     """
 let move_mouse_help_generated = """
     USAGE: move-mouse [-h|--help] [--fail-if-noop] <mouse-position>
@@ -106,7 +114,7 @@ let move_node_to_monitor_help_generated = """
     USAGE: move-node-to-monitor [-h|--help] [--window-id <window-id>] [--focus-follows-window]
                                 [--wrap-around] (left|down|up|right|next|prev)
        OR: move-node-to-monitor [-h|--help] [--window-id <window-id>] [--focus-follows-window]
-                                [--fail-if-noop] <monitor-pattern>...
+                                [--fail-if-noop] [--] <monitor-pattern>...
     """
 let move_node_to_workspace_help_generated = """
     USAGE: move-node-to-workspace [-h|--help] [--focus-follows-window] [--wrap-around]
@@ -115,25 +123,31 @@ let move_node_to_workspace_help_generated = """
        OR: move-node-to-workspace [-h|--help] [--focus-follows-window]
                                   (left|right|up|down)
        OR: move-node-to-workspace [-h|--help] [--focus-follows-window] [--fail-if-noop]
-                                  [--window-id <window-id>] <workspace-name>
+                                  [--window-id <window-id>] [--] <workspace-name>
     """
 let move_workspace_to_monitor_help_generated = """
     USAGE: move-workspace-to-monitor [-h|--help] [--workspace <workspace>] [--wrap-around] (left|down|up|right)
        OR: move-workspace-to-monitor [-h|--help] [--workspace <workspace>] [--wrap-around] (next|prev)
-       OR: move-workspace-to-monitor [-h|--help] [--workspace <workspace>] <monitor-pattern>...
+       OR: move-workspace-to-monitor [-h|--help] [--workspace <workspace>] [--] <monitor-pattern>...
     """
 let move_help_generated = """
-    USAGE: move [-h|--help] [--window-id <window-id>] [--boundaries <boundary>] [--boundaries-action <boundary-action>] (left|down|up|right)
+    USAGE: move [-h|--help] [--window-id <window-id>] [--boundaries <boundary>]
+                [--boundaries-action <boundary-action>] [--fail-if-fullscreen]
+                [--fail-if-macos-native-fullscreen] (left|down|up|right)
     """
 let overview_help_generated = """
     USAGE: overview [-h|--help] [--windows]
        OR: overview [-h|--help] (--suspend|--resume)
     """
 let reload_config_help_generated = """
-    USAGE: reload-config [-h|--help] [--no-gui] [--dry-run]
+    USAGE: reload-config [-h|--help] [--no-gui] [--dry-run] [--warnings-as-errors]
     """
 let resize_help_generated = """
     USAGE: resize [-h|--help] [--window-id <window-id>] (smart|smart-opposite|width|height) [+|-]<number>
+    """
+let run_callback_help_generated = """
+    USAGE: run-callback [-h|--help] [--for-every-window|--window-id <window-id>] on-window-detected
+       OR: run-callback [-h|--help] (on-focus-changed|on-focused-monitor-changed)
     """
 let split_help_generated = """
     USAGE: split [-h|--help] [--window-id <window-id>] (horizontal|vertical|opposite)
@@ -142,21 +156,22 @@ let subscribe_help_generated = """
     USAGE: subscribe [-h|--help] [--all] [--no-send-initial] [<event>...]
     """
 let summon_workspace_help_generated = """
-    USAGE: summon-workspace [-h|--help] [--fail-if-noop] <workspace>
+    USAGE: summon-workspace [-h|--help] [--fail-if-noop] [--] <workspace>
     """
 let swap_help_generated = """
     USAGE: swap [-h|--help] [--window-id <window-id>] [--swap-focus]
-                [--wrap-around]
-                (left|down|up|right|dfs-next|dfs-prev)
+                [--wrap-around] (left|down|up|right|dfs-next|dfs-prev)
+    """
+let test_not_help_generated = """
+    USAGE: test-not [-h|--help] <lhs> = <rhs>
+       OR: test-not [-h|--help] <lhs> ~= <rhs>
     """
 let test_help_generated = """
-    USAGE: test [-h|--help] <lhs> .= <rhs>
-       OR: test [-h|--help] <lhs> /= <rhs>
-       OR: test [-h|--help] <lhs> .~ <rhs>
-       OR: test [-h|--help] <lhs> /~ <rhs>
+    USAGE: test [-h|--help] <lhs> = <rhs>
+       OR: test [-h|--help] <lhs> ~= <rhs>
     """
 let trigger_binding_help_generated = """
-    USAGE: trigger-binding [-h|--help] <binding> --mode <mode-id>
+    USAGE: trigger-binding [-h|--help] --mode <mode-id> [--] <binding>
     """
 let true_help_generated = """
     USAGE: true [-h|--help]
@@ -170,7 +185,7 @@ let workspace_back_and_forth_help_generated = """
     USAGE: workspace-back-and-forth [-h|--help]
     """
 let workspace_help_generated = """
-    USAGE: workspace [-h|--help] [--auto-back-and-forth] [--fail-if-noop] <workspace-name>
+    USAGE: workspace [-h|--help] [--auto-back-and-forth] [--fail-if-noop] [--] <workspace-name>
        OR: workspace [-h|--help] [--wrap-around] [--stdin|--no-stdin] (next|prev)
        OR: workspace [-h|--help] (left|right|up|down)
     """

@@ -18,8 +18,19 @@ extension Workspace {
         }
     }
 
+    @MainActor
     var floatingWindows: [Window] {
-        children.filterIsInstance(of: Window.self)
+        floatingWindowsContainer.children.filterIsInstance(of: Window.self)
+    }
+
+    @MainActor
+    var floatingWindowsContainer: FloatingWindowsContainer {
+        let containers = children.filterIsInstance(of: FloatingWindowsContainer.self)
+        return switch containers.count {
+            case 0: FloatingWindowsContainer(parent: self)
+            case 1: containers.singleOrNil().orDie()
+            default: dieT("Workspace must contain zero or one FloatingWindowsContainer")
+        }
     }
 
     @MainActor var macOsNativeFullscreenWindowsContainer: MacosFullscreenWindowsContainer {
@@ -40,9 +51,9 @@ extension Workspace {
         }
     }
 
-    @MainActor var forceAssignedMonitor: Monitor? {
+    @MainActor var forceAssignedMonitor: MonitorInfo? {
         guard let monitorDescriptions = config.workspaceToMonitorForceAssignment[name] else { return nil }
-        let sortedMonitors = sortedMonitors
+        let sortedMonitors = sortedMonitorInfos
         return monitorDescriptions.lazy
             .compactMap { $0.resolveMonitor(sortedMonitors: sortedMonitors) }
             .first

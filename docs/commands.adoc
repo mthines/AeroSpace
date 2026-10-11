@@ -26,6 +26,27 @@ include::aerospace-close-all-windows-but-current.adoc[tags=synopsis]
 include::aerospace-close-all-windows-but-current.adoc[tags=purpose]
 include::aerospace-close-all-windows-but-current.adoc[tags=body]
 
+== config
+----
+include::aerospace-config.adoc[tags=synopsis]
+----
+include::aerospace-config.adoc[tags=purpose]
+include::aerospace-config.adoc[tags=body]
+
+== debug-windows
+----
+include::aerospace-debug-windows.adoc[tags=synopsis]
+----
+include::aerospace-debug-windows.adoc[tags=purpose]
+include::aerospace-debug-windows.adoc[tags=body]
+
+== echo
+----
+include::aerospace-echo.adoc[tags=synopsis]
+----
+include::aerospace-echo.adoc[tags=purpose]
+include::aerospace-echo.adoc[tags=body]
+
 == enable
 ----
 include::aerospace-enable.adoc[tags=synopsis]
@@ -33,12 +54,26 @@ include::aerospace-enable.adoc[tags=synopsis]
 include::aerospace-enable.adoc[tags=purpose]
 include::aerospace-enable.adoc[tags=body]
 
+== eval
+----
+include::aerospace-eval.adoc[tags=synopsis]
+----
+include::aerospace-eval.adoc[tags=purpose]
+include::aerospace-eval.adoc[tags=body]
+
 == exec-and-forget
 ----
 include::aerospace-exec-and-forget.adoc[tags=synopsis]
 ----
 include::aerospace-exec-and-forget.adoc[tags=purpose]
 include::aerospace-exec-and-forget.adoc[tags=body]
+
+== false
+----
+include::aerospace-false.adoc[tags=synopsis]
+----
+include::aerospace-false.adoc[tags=purpose]
+include::aerospace-false.adoc[tags=body]
 
 == flatten-workspace-tree
 ----
@@ -89,6 +124,48 @@ include::aerospace-layout.adoc[tags=synopsis]
 ----
 include::aerospace-layout.adoc[tags=purpose]
 include::aerospace-layout.adoc[tags=body]
+
+== list-apps
+----
+include::aerospace-list-apps.adoc[tags=synopsis]
+----
+include::aerospace-list-apps.adoc[tags=purpose]
+include::aerospace-list-apps.adoc[tags=body]
+
+== list-exec-env-vars
+----
+include::aerospace-list-exec-env-vars.adoc[tags=synopsis]
+----
+include::aerospace-list-exec-env-vars.adoc[tags=purpose]
+include::aerospace-list-exec-env-vars.adoc[tags=body]
+
+== list-modes
+----
+include::aerospace-list-modes.adoc[tags=synopsis]
+----
+include::aerospace-list-modes.adoc[tags=purpose]
+include::aerospace-list-modes.adoc[tags=body]
+
+== list-monitors
+----
+include::aerospace-list-monitors.adoc[tags=synopsis]
+----
+include::aerospace-list-monitors.adoc[tags=purpose]
+include::aerospace-list-monitors.adoc[tags=body]
+
+== list-windows
+----
+include::aerospace-list-windows.adoc[tags=synopsis]
+----
+include::aerospace-list-windows.adoc[tags=purpose]
+include::aerospace-list-windows.adoc[tags=body]
+
+== list-workspaces
+----
+include::aerospace-list-workspaces.adoc[tags=synopsis]
+----
+include::aerospace-list-workspaces.adoc[tags=purpose]
+include::aerospace-list-workspaces.adoc[tags=body]
 
 == macos-native-fullscreen
 ----
@@ -168,6 +245,13 @@ include::aerospace-resize.adoc[tags=synopsis]
 include::aerospace-resize.adoc[tags=purpose]
 include::aerospace-resize.adoc[tags=body]
 
+== run-callback
+----
+include::aerospace-run-callback.adoc[tags=synopsis]
+----
+include::aerospace-run-callback.adoc[tags=purpose]
+include::aerospace-run-callback.adoc[tags=body]
+
 == split
 ----
 include::aerospace-split.adoc[tags=synopsis]
@@ -175,12 +259,34 @@ include::aerospace-split.adoc[tags=synopsis]
 include::aerospace-split.adoc[tags=purpose]
 include::aerospace-split.adoc[tags=body]
 
+== subscribe
+----
+include::aerospace-subscribe.adoc[tags=synopsis]
+----
+include::aerospace-subscribe.adoc[tags=purpose]
+include::aerospace-subscribe.adoc[tags=body]
+
 == swap
 ----
 include::aerospace-swap.adoc[tags=synopsis]
 ----
 include::aerospace-swap.adoc[tags=purpose]
 include::aerospace-swap.adoc[tags=body]
+
+== test
+----
+include::aerospace-test.adoc[tags=synopsis]
+----
+include::aerospace-test.adoc[tags=purpose]
+include::aerospace-test.adoc[tags=body]
+
+== test-not
+----
+include::aerospace-test-not.adoc[tags=synopsis]
+----
+include::aerospace-test-not.adoc[tags=purpose]
+include::aerospace-test-not.adoc[tags=body]
+
 
 == summon-workspace
 ----
@@ -195,6 +301,13 @@ include::aerospace-trigger-binding.adoc[tags=synopsis]
 ----
 include::aerospace-trigger-binding.adoc[tags=purpose]
 include::aerospace-trigger-binding.adoc[tags=body]
+
+== true
+----
+include::aerospace-true.adoc[tags=synopsis]
+----
+include::aerospace-true.adoc[tags=purpose]
+include::aerospace-true.adoc[tags=body]
 
 == volume
 ----
@@ -216,95 +329,3 @@ include::aerospace-workspace-back-and-forth.adoc[tags=synopsis]
 ----
 include::aerospace-workspace-back-and-forth.adoc[tags=purpose]
 include::aerospace-workspace-back-and-forth.adoc[tags=body]
-
-== Query commands
-
-Query commands are commands that do not change the state but rather allow the examination of the current state.
-
-- Query commands are *NOT* available in config +
-(because there is no way to consume the stdout of these commands in config)
-- Query commands are only available in CLI
-
-=== config
-----
-include::aerospace-config.adoc[tags=synopsis]
-----
-include::aerospace-config.adoc[tags=purpose]
-include::aerospace-config.adoc[tags=body]
-
-=== debug-windows
-----
-include::aerospace-debug-windows.adoc[tags=synopsis]
-----
-include::aerospace-debug-windows.adoc[tags=purpose]
-include::aerospace-debug-windows.adoc[tags=body]
-
-=== false
-----
-include::aerospace-false.adoc[tags=synopsis]
-----
-include::aerospace-false.adoc[tags=purpose]
-include::aerospace-false.adoc[tags=body]
-
-=== list-apps
-----
-include::aerospace-list-apps.adoc[tags=synopsis]
-----
-include::aerospace-list-apps.adoc[tags=purpose]
-include::aerospace-list-apps.adoc[tags=body]
-
-=== list-exec-env-vars
-----
-include::aerospace-list-exec-env-vars.adoc[tags=synopsis]
-----
-include::aerospace-list-exec-env-vars.adoc[tags=purpose]
-include::aerospace-list-exec-env-vars.adoc[tags=body]
-
-=== list-modes
-----
-include::aerospace-list-modes.adoc[tags=synopsis]
-----
-include::aerospace-list-modes.adoc[tags=purpose]
-include::aerospace-list-modes.adoc[tags=body]
-
-=== list-monitors
-----
-include::aerospace-list-monitors.adoc[tags=synopsis]
-----
-include::aerospace-list-monitors.adoc[tags=purpose]
-include::aerospace-list-monitors.adoc[tags=body]
-
-=== list-windows
-----
-include::aerospace-list-windows.adoc[tags=synopsis]
-----
-include::aerospace-list-windows.adoc[tags=purpose]
-include::aerospace-list-windows.adoc[tags=body]
-
-=== list-workspaces
-----
-include::aerospace-list-workspaces.adoc[tags=synopsis]
-----
-include::aerospace-list-workspaces.adoc[tags=purpose]
-include::aerospace-list-workspaces.adoc[tags=body]
-
-=== subscribe
-----
-include::aerospace-subscribe.adoc[tags=synopsis]
-----
-include::aerospace-subscribe.adoc[tags=purpose]
-include::aerospace-subscribe.adoc[tags=body]
-
-=== test
-----
-include::aerospace-test.adoc[tags=synopsis]
-----
-include::aerospace-test.adoc[tags=purpose]
-include::aerospace-test.adoc[tags=body]
-
-=== true
-----
-include::aerospace-true.adoc[tags=synopsis]
-----
-include::aerospace-true.adoc[tags=purpose]
-include::aerospace-true.adoc[tags=body]
