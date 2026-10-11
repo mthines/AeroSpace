@@ -12,7 +12,11 @@ final class WorkspaceCommandTest: XCTestCase {
     func testParseWorkspaceCommand() {
         testParseCommandFail("workspace my mail", msg: "ERROR: Unknown argument 'mail'", exitCode: 2)
         testParseCommandFail("workspace 'my mail'", msg: "ERROR: Whitespace characters are forbidden in workspace names", exitCode: 2)
-        assertEquals(parseCommand("workspace").errorOrNil, "ERROR: Argument '(<workspace-name>|next|prev)' is mandatory")
+        assertEquals(parseCommand("workspace").errorOrNil, "ERROR: Argument '(<workspace-name>|next|prev|left|right|up|down)' is mandatory")
+        testParseSingleCommandSucc("workspace up", WorkspaceCmdArgs(target: .direction(.up)))
+        testParseSingleCommandSucc("workspace down", WorkspaceCmdArgs(target: .direction(.down)))
+        testParseSingleCommandSucc("workspace left", WorkspaceCmdArgs(target: .direction(.left)))
+        testParseSingleCommandSucc("workspace right", WorkspaceCmdArgs(target: .direction(.right)))
         testParseSingleCommandSucc("workspace next", WorkspaceCmdArgs(target: .relative(.next)))
         testParseSingleCommandSucc("workspace --auto-back-and-forth W", WorkspaceCmdArgs(target: .direct(.parse("W").getOrDie()), autoBackAndForth: true))
         assertEquals(parseCommand("workspace --wrap-around W").errorOrNil, "--wrapAround requires using (next|prev) argument")
@@ -26,7 +30,7 @@ final class WorkspaceCommandTest: XCTestCase {
     func testParseDashDash() {
         testParseSingleCommandSucc("workspace -- foo", WorkspaceCmdArgs(target: .direct(.parse("foo").getOrDie())))
         assertEquals(parseCommand("workspace -- next").errorOrNil, "ERROR: 'next' is a reserved workspace name")
-        assertEquals(parseCommand("workspace --").errorOrNil, "ERROR: Argument \'(<workspace-name>|next|prev)\' is mandatory")
+        assertEquals(parseCommand("workspace --").errorOrNil, "ERROR: Argument \'(<workspace-name>|next|prev|left|right|up|down)\' is mandatory")
         testParseSingleCommandSucc(
             "workspace --auto-back-and-forth -- foo",
             WorkspaceCmdArgs(target: .direct(.parse("foo").getOrDie()), autoBackAndForth: true),

@@ -23,6 +23,12 @@ struct MoveNodeToWorkspaceCommand: Command {
                 targetWorkspace = ws
             case .direct(let name):
                 targetWorkspace = Workspace.get(byName: name.raw)
+            case .direction(let dir):
+                guard isOverviewActive,
+                      let subjectWs,
+                      let next = OverviewManager.shared.adjacentSelectedWorkspace(from: subjectWs.name, direction: dir)
+                else { return .succ }
+                targetWorkspace = next
         }
         return moveWindowToWorkspace(window, targetWorkspace, io, focusFollowsWindow: args.focusFollowsWindow, failIfNoop: args.failIfNoop)
     }

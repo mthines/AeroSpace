@@ -72,6 +72,15 @@ private struct FrozenFocus: AeroAny, Equatable, Sendable {
     let status = newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
 
     newFocus.windowOrNil?.markAsMostRecentChild()
+
+    // Keep overview in sync with focus changes: move the highlight, refresh the grid, or
+    // close it when focus lands outside what it shows (see syncToFocusChange). Focus
+    // changes on a different monitor leave the overview alone — the grid is anchored
+    // to one monitor and other-monitor activity has nothing to display.
+    if isOverviewActive && !OverviewManager.shared.isClosing && OverviewManager.shared.isOnAnchorMonitor(newFocus.workspace) {
+        OverviewManager.shared.syncToFocusChange(newFocus)
+    }
+
     return status
 }
 extension Window {

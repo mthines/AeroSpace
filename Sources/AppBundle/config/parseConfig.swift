@@ -157,6 +157,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseFocusFollowsMouse),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
+    "overview": Parser(\.overview, parseOverviewConfig),
 
     // Deprecated
     "non-empty-workspaces-root-containers-layout-on-startup": Parser(\._nonEmptyWorkspacesRootContainersLayoutOnStartup, parseStartupRootContainerLayout),
@@ -501,4 +502,48 @@ func expectedActualTypeDiagnostic(expected: TomlType, actual: TomlType, _ backtr
 
 func expectedActualTypeDiagnostic(expected: [TomlType], actual: TomlType, _ backtrace: ConfigBacktrace) -> ConfigParseDiagnostic {
     .init(backtrace, expectedActualTypeError(expected: expected, actual: actual))
+}
+
+private let overviewConfigParser: [String: any ParserProtocol<OverviewConfig>] = [
+    "workspaces": Parser(\.workspaces) { parseArrayOfStrings($0, $1).map { Optional($0) } },
+    "exclude-workspaces": Parser(\.excludeWorkspaces, parseArrayOfStrings),
+    "columns": Parser(\.columns, parseOverviewColumns),
+    "cell-label": Parser(\.cellLabel, parseOverviewCellLabel),
+    "dim-background": Parser(\.dimBackground, parseBool),
+    "dim-opacity": Parser(\.dimOpacity, parseOverviewDimOpacity),
+]
+
+func parseOverviewConfig(_ raw: OrderedJson, _ backtrace: ConfigBacktrace, _ c: inout ConfigParserContext) -> OverviewConfig {
+    var cfg = parseTable(raw, OverviewConfig(), overviewConfigParser, backtrace, &c)
+    if cfg.workspaces != nil && !cfg.excludeWorkspaces.isEmpty {
+        c.errors.append(.init(backtrace, "'workspaces' and 'exclude-workspaces' are mutually exclusive — use one or the other"))
+        cfg.excludeWorkspaces = []
+    }
+    return cfg
+}
+
+private func parseOverviewCellLabel(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<OverviewCellLabel> {
+    parseString(raw, backtrace).flatMap { parseEnum($0, OverviewCellLabel.self).toParsedConfig(backtrace) }
+}
+
+private func parseOverviewColumns(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<OverviewColumns> {
+    if let str = raw.asStringOrNil {
+        if str == "auto" { return .success(.auto) }
+        return .failure(.init(backtrace, "Invalid columns value '\(str)'. Expected 'auto' or a positive integer"))
+    }
+    if let n = raw.asIntOrNil {
+        if n > 0 { return .success(.fixed(n)) }
+        return .failure(.init(backtrace, "columns must be a positive integer, got \(n)"))
+    }
+    return .failure(expectedActualTypeDiagnostic(expected: [.string, .int], actual: raw.tomlType, backtrace))
+}
+
+/// dim-opacity accepts an integer 0..100 (percentage). 70 means 70% opacity.
+private func parseOverviewDimOpacity(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<Double> {
+    parseInt(raw, backtrace).flatMap { n in
+        if (0 ... 100).contains(n) {
+            return .success(Double(n) / 100.0)
+        }
+        return .failure(.init(backtrace, "dim-opacity must be an integer between 0 and 100, got \(n)"))
+    }
 }

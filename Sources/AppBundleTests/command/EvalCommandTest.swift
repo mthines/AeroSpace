@@ -70,7 +70,7 @@ final class EvalCommandTest: XCTestCase {
         let result = await parseCommand("eval 'workspace'").cmdOrDie.run(.defaultEnv, .emptyStdin)
         assertEquals(result.exitCode.rawValue, 2)
         assertEquals(result.stdout, [])
-        assertEquals(result.stderr, ["ERROR: Argument '(<workspace-name>|next|prev)' is mandatory"])
+        assertEquals(result.stderr, ["ERROR: Argument '(<workspace-name>|next|prev|left|right|up|down)' is mandatory"])
     }
 
     func testRunRejectsInnerHelp() async {

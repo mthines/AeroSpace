@@ -194,6 +194,12 @@ final class MacWindow: Window {
         macApp.setAxFrame(windowId, topLeft, size)
     }
 
+    /// Awaitable `setAxFrame`; see `MacApp.setAxFrameBlocking`. Non-cancellable so the overview's
+    /// moves into and out of its grid always complete.
+    func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?) async throws {
+        try await macApp.setAxFrameBlocking(windowId, topLeft, size, .nonCancellable)
+    }
+
     override func getAxRect(_ cm: CancellationMode) async throws -> Rect? {
         try await macApp.getAxRect(windowId, cm)
     }

@@ -125,8 +125,12 @@ private func refresh() async throws {
     let mapping = try await MacApp.refreshAllAndGetAliveWindowIds(frontmostAppBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
     let aliveWindowIds = mapping.values.flatMap(id).toSet()
 
+    var didCloseOverviewWindow = false
     for window in MacWindow.allWindows {
         if !aliveWindowIds.contains(window.windowId) {
+            if isOverviewActive && OverviewManager.shared.isWindowInOverview(window.windowId) {
+                didCloseOverviewWindow = true
+            }
             window.garbageCollect(skipClosedWindowsCache: false)
         }
     }
@@ -138,6 +142,10 @@ private func refresh() async throws {
 
     // Garbage collect workspaces after apps, because workspaces contain apps.
     Workspace.garbageCollectUnusedWorkspaces()
+
+    if didCloseOverviewWindow {
+        Task.startUnstructured { @MainActor in try? await OverviewManager.shared.refreshLayout() }
+    }
 }
 
 func refreshObs(_: AXObserver, _: AXUIElement, notif: CFString, _: UnsafeMutableRawPointer?) {
@@ -154,6 +162,12 @@ enum OptimalHideCorner {
 
 @MainActor
 private func layoutWorkspaces() async throws {
+    // While the overview is open, OverviewManager owns every window's physical frame on
+    // its anchor monitor — route those changes through refreshLayout. Off-anchor monitors
+    // continue through the normal layout pass below so workspace switches there reflect.
+    if isOverviewActive && !OverviewManager.shared.isClosing && !OverviewManager.shared.isRefreshing {
+        Task.startUnstructured { @MainActor in try? await OverviewManager.shared.refreshLayout() }
+    }
     if !TrayMenuModel.shared.isEnabled {
         for workspace in Workspace.all {
             workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!
@@ -189,11 +203,13 @@ private func layoutWorkspaces() async throws {
 
     // to reduce flicker, first unhide visible workspaces, then hide invisible ones
     for monitor in monitors {
+        if isOverviewActive && OverviewManager.shared.isAnchorMonitor(monitor) { continue }
         let workspace = monitor.activeWorkspace
         workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!
         try await workspace.layoutWorkspace()
     }
     for workspace in Workspace.all where !workspace.isVisible {
+        if isOverviewActive && OverviewManager.shared.isAnchorMonitor(workspace.workspaceMonitor) { continue }
         let corner = monitorToOptimalHideCorner[workspace.workspaceMonitor.rect.topLeftCorner] ?? .bottomRightCorner
         for window in workspace.allLeafWindowsRecursive {
             try await (window as! MacWindow).hideInCorner(corner) // todo as!

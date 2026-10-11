@@ -156,6 +156,18 @@ final class MacApp: AbstractApp {
         }
     }
 
+    /// Like `setAxFrame`, but suspends until the frame change has been applied. The overview
+    /// uses it to finish moving windows into (and out of) its grid before it shows the HUD
+    /// or hands focus back.
+    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, _ cm: CancellationMode) async throws {
+        setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        try await withWindow(windowId, cm) { [axApp] window, job in
+            try disableAnimations(app: axApp.threadGuarded, job) {
+                try setFrame(window, topLeft, size, job)
+            }
+        }
+    }
+
     func setAxFrameForTermination(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         let semaphore = DispatchSemaphore(value: 0)

@@ -120,6 +120,8 @@ let move_node_to_workspace_help_generated = """
     USAGE: move-node-to-workspace [-h|--help] [--focus-follows-window] [--wrap-around]
                                   [--stdin|--no-stdin]
                                   (next|prev)
+       OR: move-node-to-workspace [-h|--help] [--focus-follows-window]
+                                  (left|right|up|down)
        OR: move-node-to-workspace [-h|--help] [--focus-follows-window] [--fail-if-noop]
                                   [--window-id <window-id>] [--] <workspace-name>
     """
@@ -132,6 +134,10 @@ let move_help_generated = """
     USAGE: move [-h|--help] [--window-id <window-id>] [--boundaries <boundary>]
                 [--boundaries-action <boundary-action>] [--fail-if-fullscreen]
                 [--fail-if-macos-native-fullscreen] (left|down|up|right)
+    """
+let overview_help_generated = """
+    USAGE: overview [-h|--help] [--windows]
+       OR: overview [-h|--help] (--suspend|--resume)
     """
 let reload_config_help_generated = """
     USAGE: reload-config [-h|--help] [--no-gui] [--dry-run] [--warnings-as-errors]
@@ -181,4 +187,5 @@ let workspace_back_and_forth_help_generated = """
 let workspace_help_generated = """
     USAGE: workspace [-h|--help] [--auto-back-and-forth] [--fail-if-noop] [--] <workspace-name>
        OR: workspace [-h|--help] [--wrap-around] [--stdin|--no-stdin] (next|prev)
+       OR: workspace [-h|--help] (left|right|up|down)
     """

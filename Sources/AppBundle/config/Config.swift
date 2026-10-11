@@ -61,6 +61,7 @@ struct Config: ConvenienceMutable {
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: Shell<any Command> = .empty
+    var overview: OverviewConfig = OverviewConfig()
 }
 
 struct FocusFollowsMouse: ConvenienceMutable {
@@ -80,4 +81,24 @@ enum ConfigVersion: Int, Comparable, CaseIterable, Sendable, CustomStringConvert
 
 enum DefaultContainerOrientation: String {
     case horizontal, vertical, auto
+}
+
+struct OverviewConfig: ConvenienceMutable, Equatable {
+    var workspaces: [String]? = nil         // nil = all non-empty workspaces
+    var excludeWorkspaces: [String] = []
+    var columns: OverviewColumns = .auto
+    var cellLabel: OverviewCellLabel = .workspaceName
+    var dimBackground: Bool = true
+    var dimOpacity: Double = 0.7
+}
+
+enum OverviewColumns: Equatable {
+    case auto
+    case fixed(Int)
+}
+
+enum OverviewCellLabel: String, CaseIterable, Equatable {
+    case workspaceName = "workspace-name"
+    case appList = "app-list"
+    case both = "both"
 }

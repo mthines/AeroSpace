@@ -1,0 +1,70 @@
+= aerospace-overview(1)
+include::util/man-attributes.adoc[]
+:manname: aerospace-overview
+// tag::purpose[]
+:manpurpose: Show a Mission Control-style overview of workspaces or of the focused workspace's windows
+// end::purpose[]
+
+// =========================================================== Synopsis
+== Synopsis
+[verse]
+// tag::synopsis[]
+aerospace overview [-h|--help] [--windows]
+aerospace overview [-h|--help] (--suspend|--resume)
+
+// end::synopsis[]
+
+// =========================================================== Description
+== Description
+
+// tag::body[]
+{manpurpose}
+
+When invoked, selected workspaces' windows are physically repositioned into a
+grid on the active monitor. Each cell shows a workspace's actual live windows
+rendered natively. A dimming overlay appears behind the repositioned windows.
+
+With `--windows`, the grid shows the windows of the focused workspace instead:
+one cell per window, each window filling its cell. Use it to pick a window when
+many share one workspace, e.g. in an accordion layout or while a window is
+fullscreen.
+
+Use arrow keys or hjkl to navigate between cells, Enter to switch focus to the
+selected workspace (or window, with `--windows`), or Esc to close the overview
+without changing focus. All windows are restored to their exact original
+positions when the overview closes. Running `overview` with or without
+`--windows` while an overview is open closes it.
+
+Configure the command with the `[overview]` block in your config file.
+
+// =========================================================== Options
+include::util/conditional-options-header.adoc[]
+
+-h, --help:: Print help
+
+--windows:: Show the focused workspace's windows, one cell per window, instead
+of one cell per workspace. Tiling windows come first in tree order (the order
+`focus dfs-next` visits them), then floating windows. Windows in macOS native
+fullscreen and windows of hidden apps are not shown. Cells are labeled with the
+app name and window title; the `[overview]` `workspaces`, `exclude-workspaces`
+and `cell-label` options don't apply. If a window of the workspace was
+fullscreen (see `fullscreen` command) when the overview opened, the window
+focused when it closes becomes the fullscreen one.
+
+--suspend:: Pause the overview without tearing it down: hide the HUD and dim
+panel, restore window frames, and keep the anchor monitor and snapshot state.
+Use before switching to a non-grid workspace (e.g. a scratchpad) so the next
+`--resume` can re-establish the same grid. No-op when the overview is closed
+or already suspended.
+
+--resume:: Re-establish a suspended overview on its original anchor monitor.
+Windows are re-snapshotted so any moves made while suspended are reflected.
+No-op when the overview is not suspended.
+
+`--suspend` and `--resume` are mutually exclusive, and neither can be combined
+with `--windows`.
+
+// end::body[]
+
+// =========================================================== Footer
+include::util/man-footer.adoc[]
