@@ -3,11 +3,12 @@ import SwiftUI
 import Common
 
 struct OverviewCellInfo: Identifiable {
-    let id: String              // workspace name
-    let workspaceName: String
+    let target: OverviewCellTarget
     /// Cell rect relative to the HUD panel in SwiftUI coordinates (Y-down, origin at top-left).
     let hudFrame: CGRect
     let label: String
+
+    var id: OverviewCellTarget { target }
 }
 
 struct OverviewHUDView: View {
@@ -42,12 +43,16 @@ struct OverviewHUDView: View {
             Text(cell.label)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                 .foregroundColor(.white)
+                // Window titles can be long: keep the label on one line inside its cell.
+                .lineLimit(1)
+                .truncationMode(.tail)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
                         .fill(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.55)),
                 )
+                .padding(.horizontal, 8)
                 .padding(.top, 6)
                 .allowsHitTesting(false)
         }

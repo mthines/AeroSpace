@@ -1,15 +1,24 @@
 import AppKit
 import Common
 
-/// Manages the full lifecycle of the workspace overview: snapshot window frames,
-/// move windows into a Mission-Control-style grid, show dim panel + HUD, and
-/// restore window positions on close.
+/// Manages the full lifecycle of the overview: snapshot window frames, move windows into a
+/// Mission-Control-style grid, show dim panel + HUD, and restore window positions on close.
+/// The grid shows either workspaces (one cell per workspace) or the windows of a single
+/// workspace (one cell per window) — see `OverviewMode`.
 @MainActor final class OverviewManager {
     static let shared = OverviewManager()
     private init() {}
 
     private var snapshots: [OverviewWindowSnapshot] = []
     private var snapshotIds: Set<UInt32> = []
+
+    /// What the grid shows. Set on activate, preserved across suspend/resume, reset on close.
+    private var mode: OverviewMode = .workspaces
+
+    /// Windows mode only: the workspace's AeroSpace-fullscreen window when the grid opened.
+    /// On close, fullscreen moves to whichever window of that workspace ended up focused, so
+    /// switching windows from the grid keeps the workspace in fullscreen.
+    private var fullscreenWindowAtOpen: (windowId: UInt32, noOuterGaps: Bool)?
 
     /// Monitor the overview is anchored to, identified by `rect.topLeftCorner` so it
     /// survives display reconfiguration. Captured on activate; the grid, HUD, and dim
@@ -48,11 +57,13 @@ import Common
         return monitor.rect.topLeftCorner == corner
     }
 
-    /// True if the named workspace would pass the overview's allowlist/excludelist filter.
-    /// Empty workspaces still return true here — they're filtered at activation by
-    /// `selectWorkspaces`, which combines this check with isEffectivelyEmpty.
+    /// True if the named workspace belongs in the grid: in workspaces mode, it passes the
+    /// overview's allowlist/excludelist filter; in windows mode, it is the workspace whose
+    /// windows are shown. Empty workspaces still return true here — they're filtered at
+    /// activation by `selectWorkspaces`, which combines this check with isEffectivelyEmpty.
     func isWorkspaceEligibleForOverview(_ name: String?) -> Bool {
         guard let name else { return false }
+        if case .windows(let workspaceName) = mode { return name == workspaceName }
         let cfg = config.overview
         if let allowList = cfg.workspaces { return allowList.contains(name) }
         if !cfg.excludeWorkspaces.isEmpty { return !cfg.excludeWorkspaces.contains(name) }
@@ -61,8 +72,10 @@ import Common
 
     /// Returns the workspace at the grid-adjacent cell in the given direction.
     /// Used by FocusCommand to wrap ctrl+arrow keys to adjacent workspaces while
-    /// the overview is open.
+    /// the overview is open. Always nil in windows mode — its cells are windows, not
+    /// workspaces — so callers fall back to their normal in-workspace behavior.
     func adjacentSelectedWorkspace(from name: String, direction: CardinalDirection) -> Workspace? {
+        guard mode == .workspaces else { return nil }
         let workspaces = selectWorkspaces()
         guard let idx = workspaces.firstIndex(where: { $0.name == name }) else { return nil }
         let cols = resolveColumns(forCount: workspaces.count)
@@ -77,9 +90,11 @@ import Common
         return workspaces[target]
     }
 
-    func activate() async throws {
+    /// Open the overview in `newMode`. While any overview is open, this closes it instead,
+    /// so both `overview` and `overview --windows` hotkeys act as toggles.
+    func activate(mode newMode: OverviewMode) async throws {
         guard !isOverviewActive else {
-            try await deactivate(selectWorkspace: nil)
+            try await deactivate(select: nil)
             return
         }
         // Explicit re-activation discards any preserved suspend state — the hotkey
@@ -87,6 +102,14 @@ import Common
         isSuspended = false
         snapshots = []
         snapshotIds = []
+        mode = newMode
+        fullscreenWindowAtOpen = nil
+        if case .windows = newMode,
+           let window = focus.workspace.rootTilingContainer.mostRecentWindowRecursive,
+           window.isFullscreen
+        {
+            fullscreenWindowAtOpen = (window.windowId, window.noOuterGapsInFullscreen)
+        }
         anchorMonitorCorner = focus.workspace.workspaceMonitor.rect.topLeftCorner
         isOverviewActive = true
         try await applyOverviewLayout(initialOpen: true)
@@ -134,14 +157,36 @@ import Common
         try await applyOverviewLayout(initialOpen: false)
     }
 
+    /// Keep the overview in sync with a focus change on the anchor monitor: move the
+    /// highlight when focus lands on a window already in the grid, refresh the grid when
+    /// it lands on a new window that belongs in it, and close the overview when focus
+    /// leaves what the grid shows. Called from setFocus.
+    func syncToFocusChange(_ newFocus: LiveFocus) {
+        if let win = newFocus.windowOrNil {
+            if isWindowInOverview(win.windowId) {
+                if let target = cellTarget(for: newFocus) {
+                    OverviewHUD.shared.syncSelection(to: target)
+                }
+            } else if isWorkspaceEligibleForOverview(win.nodeWorkspace?.name) {
+                Task { @MainActor in try? await self.refreshLayout() }
+            } else {
+                Task { @MainActor in try? await self.deactivate(select: nil) }
+            }
+        } else if case .windows(let workspaceName) = mode, newFocus.workspace.name != workspaceName {
+            // Windows mode shows a single workspace: switching to another one closes it.
+            Task { @MainActor in try? await self.deactivate(select: nil) }
+        } else {
+            Task { @MainActor in try? await self.refreshLayout() }
+        }
+    }
+
     private func applyOverviewLayout(initialOpen: Bool) async throws {
         let selectedWorkspaces = selectWorkspaces()
         guard let anchor = resolveAnchorMonitor(), !selectedWorkspaces.isEmpty else {
             if initialOpen {
-                isOverviewActive = false
-                anchorMonitorCorner = nil
+                abortOpen()
             } else {
-                try await deactivate(selectWorkspace: nil)
+                try await deactivate(select: nil)
             }
             return
         }
@@ -174,10 +219,11 @@ import Common
 
         // Snapshot every window. Preserve `frame` from existing snapshots so restore-on-Esc
         // returns to the pre-overview position even after a refresh-layout pass.
+        let contents = cellContents(of: selectedWorkspaces)
         let existingFrames: [UInt32: Rect] = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.windowId, $0.frame) })
         var newSnapshots: [OverviewWindowSnapshot] = []
-        for workspace in selectedWorkspaces {
-            for window in workspace.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }) {
+        for content in contents {
+            for window in content.windows {
                 let frame: Rect? = if let existing = existingFrames[window.windowId] {
                     existing
                 } else if let layoutRect = window.lastAppliedLayoutPhysicalRect {
@@ -186,31 +232,45 @@ import Common
                     try await window.getAxRect()
                 }
                 guard let frame else { continue }
-                newSnapshots.append(OverviewWindowSnapshot(window: window, frame: frame, workspaceName: workspace.name))
+                newSnapshots.append(OverviewWindowSnapshot(window: window, frame: frame, cellTarget: content.target))
             }
         }
         guard !newSnapshots.isEmpty else {
             if initialOpen {
-                isOverviewActive = false
+                abortOpen()
             } else {
-                try await deactivate(selectWorkspace: nil)
+                try await deactivate(select: nil)
             }
             return
         }
 
+        // A window that left the grid while it was open (e.g. moved to another workspace)
+        // would otherwise stay in its old cell. Put it back where it was and hide it if its
+        // new workspace isn't on screen; the post-close layout pass handles the rest.
+        let newSnapshotIds = Set(newSnapshots.map(\.windowId))
+        for snapshot in snapshots where !newSnapshotIds.contains(snapshot.windowId) {
+            guard let workspace = snapshot.window.nodeWorkspace, !workspace.isVisible else { continue }
+            try await snapshot.window.setAxFrameBlocking(
+                snapshot.frame.topLeftCorner,
+                CGSize(width: snapshot.frame.width, height: snapshot.frame.height),
+            )
+            try await snapshot.window.hideInCorner(.bottomRightCorner)
+        }
+
         let monitorRect = anchor.visibleRect
-        let (overviewCells, columns) = computeOverviewCells(for: selectedWorkspaces, monitorRect: monitorRect)
-        let cellByName: [String: OverviewCell] = Dictionary(uniqueKeysWithValues: overviewCells.map { ($0.workspaceName, $0) })
+        let (overviewCells, columns) = computeOverviewCells(for: contents.map(\.target), monitorRect: monitorRect)
+        let cellByTarget: [OverviewCellTarget: OverviewCell] = Dictionary(uniqueKeysWithValues: overviewCells.map { ($0.target, $0) })
 
         // Move windows into their cell slots (blocking so the HUD doesn't reveal before
         // the move). For tiling windows, use the freshly-computed lastAppliedLayoutPhysicalRect
         // (from the dry-run pass above) for cell positioning so existing windows reflow
         // when neighbors are added or removed. snapshot.frame is reserved for restore.
-        // Fullscreen windows fill their cell so the toggle is visible mid-overview.
+        // Fullscreen windows fill their cell so the toggle is visible mid-overview, and so
+        // does every window in windows mode, where each window has a cell to itself.
         for snapshot in newSnapshots {
-            guard let cell = cellByName[snapshot.workspaceName] else { continue }
+            guard let cell = cellByTarget[snapshot.cellTarget] else { continue }
             let targetFrame: Rect
-            if snapshot.window.isFullscreen {
+            if snapshot.window.isFullscreen || mode != .workspaces {
                 targetFrame = cell.frame
             } else {
                 let positioningFrame = snapshot.window.lastAppliedLayoutPhysicalRect ?? snapshot.frame
@@ -222,34 +282,43 @@ import Common
             )
         }
         self.snapshots = newSnapshots
-        self.snapshotIds = Set(newSnapshots.map(\.windowId))
+        self.snapshotIds = newSnapshotIds
+
+        let hudCells = try await buildHudCells(for: overviewCells, monitorRect: monitorRect)
+        // The awaits above are suspension points: the overview may have been closed in
+        // the meantime (e.g. by a focus change). Don't bring the HUD back in that case.
+        guard isOverviewActive, !isClosing else { return }
 
         let dimOpacity = config.overview.dimBackground ? config.overview.dimOpacity : 0.0
         OverviewDimPanel.shared.show(monitorFrame: monitorRect, opacity: dimOpacity)
 
-        let hudCells = buildHudCells(for: overviewCells, monitorRect: monitorRect)
         OverviewHUD.shared.show(
             monitorFrame: monitorRect,
             cells: hudCells,
             columnCount: columns,
-            onCommit: { [weak self] workspaceName in
+            initialSelection: cellTarget(for: focus),
+            onCommit: { [weak self] target in
                 guard let self else { return }
-                Task { @MainActor in try? await self.deactivate(selectWorkspace: workspaceName) }
+                Task { @MainActor in try? await self.deactivate(select: target) }
             },
             onCancel: { [weak self] in
                 guard let self else { return }
-                Task { @MainActor in try? await self.deactivate(selectWorkspace: nil) }
+                Task { @MainActor in try? await self.deactivate(select: nil) }
             },
         )
     }
 
-    func deactivate(selectWorkspace: String?) async throws {
+    /// Close the overview, restore every window, and focus `target` when given: the
+    /// selected workspace, or the selected window in windows mode.
+    func deactivate(select target: OverviewCellTarget?) async throws {
         guard !isClosing else { return }
         isClosing = true
         defer {
             isOverviewActive = false
             isClosing = false
             isSuspended = false
+            mode = .workspaces
+            fullscreenWindowAtOpen = nil
             snapshots = []
             snapshotIds = []
             anchorMonitorCorner = nil
@@ -267,25 +336,52 @@ import Common
             )
         }
 
-        // focusWorkspace updates _focus to point at the workspace's MRU window.
-        // The explicit nativeFocus drives NSApp.activate at the macOS level —
+        // focusWorkspace / focusWindow update _focus (setFocus skips the overview hook while
+        // isClosing). The explicit nativeFocus drives NSApp.activate at the macOS level —
         // without it, the post-deactivate refresh's updateFocusCache(getNativeFocusedWindow)
         // would observe whichever app was macOS-focused before the overview opened
         // and snap _focus back, undoing the user's chosen target.
-        if let name = selectWorkspace {
-            let workspace = Workspace.get(byName: name)
-            _ = workspace.focusWorkspace()
-            if let mru = workspace.mostRecentWindowRecursive as? MacWindow {
-                mru.nativeFocus()
-            }
+        switch target {
+            case .workspace(let name):
+                let workspace = Workspace.get(byName: name)
+                _ = workspace.focusWorkspace()
+                if let mru = workspace.mostRecentWindowRecursive as? MacWindow {
+                    mru.nativeFocus()
+                }
+            case .window(let windowId):
+                if let window = Window.get(byId: windowId) {
+                    _ = window.focusWindow()
+                    window.nativeFocus()
+                }
+            case nil:
+                break
         }
+        moveFullscreenToFocusedWindow()
+    }
+
+    /// Windows mode: when the workspace was in AeroSpace fullscreen as the grid opened and a
+    /// different tiling window of it is focused now (selected with Enter, clicked, or reached
+    /// with a focus command), make that window the fullscreen one. Plain AeroSpace focus
+    /// semantics would instead drop the workspace back to its tiled layout.
+    private func moveFullscreenToFocusedWindow() {
+        guard case .windows(let workspaceName) = mode,
+              let original = fullscreenWindowAtOpen,
+              let focused = focus.windowOrNil,
+              focused.windowId != original.windowId,
+              !focused.isFloating,
+              focused.nodeWorkspace?.name == workspaceName
+        else { return }
+        Window.get(byId: original.windowId)?.isFullscreen = false
+        focused.isFullscreen = true
+        focused.noOuterGapsInFullscreen = original.noOuterGaps
     }
 
     /// Workspaces currently displayed in the overview grid. Empty array when the
-    /// overview is not active. Public so `workspace next/prev` can iterate the same
-    /// list the user sees while the overview is open.
+    /// overview is not active, and in windows mode (its cells are windows), so
+    /// `workspace next/prev` iterates the same list the user sees while the
+    /// workspaces overview is open and keeps its normal order otherwise.
     func displayedWorkspaces() -> [Workspace] {
-        isOverviewActive ? selectWorkspaces() : []
+        isOverviewActive && mode == .workspaces ? selectWorkspaces() : []
     }
 
     private func selectWorkspaces() -> [Workspace] {
@@ -299,13 +395,53 @@ import Common
         }
     }
 
+    /// One grid cell's content: what selecting the cell focuses, and the windows drawn in it.
+    private struct CellContent {
+        let target: OverviewCellTarget
+        let windows: [MacWindow]
+    }
+
+    /// Workspaces mode: one cell per workspace holding all of its windows.
+    /// Windows mode: one cell per window, in `overviewGridWindows` order.
+    private func cellContents(of workspaces: [Workspace]) -> [CellContent] {
+        switch mode {
+            case .workspaces:
+                workspaces.map { workspace in
+                    CellContent(
+                        target: .workspace(workspace.name),
+                        windows: workspace.allLeafWindowsRecursive.compactMap { $0 as? MacWindow },
+                    )
+                }
+            case .windows:
+                workspaces
+                    .flatMap { $0.overviewGridWindows.compactMap { $0 as? MacWindow } }
+                    .map { CellContent(target: .window($0.windowId), windows: [$0]) }
+        }
+    }
+
+    /// The cell holding `liveFocus`: its workspace's cell, or in windows mode its window's.
+    private func cellTarget(for liveFocus: LiveFocus) -> OverviewCellTarget? {
+        switch mode {
+            case .workspaces: .workspace(liveFocus.workspace.name)
+            case .windows: liveFocus.windowOrNil.map { .window($0.windowId) }
+        }
+    }
+
+    /// Reset after an initial open (or resume) that found nothing to show.
+    private func abortOpen() {
+        isOverviewActive = false
+        anchorMonitorCorner = nil
+        mode = .workspaces
+        fullscreenWindowAtOpen = nil
+    }
+
     private func resolveAnchorMonitor() -> Monitor? {
         guard let corner = anchorMonitorCorner else { return nil }
         return monitors.first(where: { $0.rect.topLeftCorner == corner })
     }
 
     struct OverviewCell {
-        let workspaceName: String
+        let target: OverviewCellTarget
         /// Cell rect on monitor in AeroSpace coordinates (top-left origin, Y-down).
         let frame: Rect
     }
@@ -330,8 +466,8 @@ import Common
         }
     }
 
-    private func computeOverviewCells(for workspaces: [Workspace], monitorRect: Rect) -> ([OverviewCell], Int) {
-        let count = workspaces.count
+    private func computeOverviewCells(for targets: [OverviewCellTarget], monitorRect: Rect) -> ([OverviewCell], Int) {
+        let count = targets.count
         guard count > 0 else { return ([], 1) }
 
         let columns = resolveColumns(forCount: count)
@@ -341,13 +477,13 @@ import Common
         let cellW = (monitorRect.width - padding * CGFloat(columns + 1)) / CGFloat(columns)
         let cellH = (monitorRect.height - padding * CGFloat(rows + 1)) / CGFloat(rows)
 
-        let cells = workspaces.enumerated().map { index, workspace in
+        let cells = targets.enumerated().map { index, target in
             let col = index % columns
             let row = index / columns
             let x = monitorRect.topLeftX + padding + CGFloat(col) * (cellW + padding)
             let y = monitorRect.topLeftY + padding + CGFloat(row) * (cellH + padding)
             return OverviewCell(
-                workspaceName: workspace.name,
+                target: target,
                 frame: Rect(topLeftX: x, topLeftY: y, width: cellW, height: cellH),
             )
         }
@@ -370,28 +506,32 @@ import Common
         return Rect(topLeftX: newX, topLeftY: newY, width: newW, height: newH)
     }
 
-    private func buildHudCells(for overviewCells: [OverviewCell], monitorRect: Rect) -> [OverviewCellInfo] {
-        let snapshotsByWorkspace: [String: [OverviewWindowSnapshot]] = Dictionary(grouping: snapshots, by: \.workspaceName)
-        let cellLabel = config.overview.cellLabel
+    private func buildHudCells(for overviewCells: [OverviewCell], monitorRect: Rect) async throws -> [OverviewCellInfo] {
+        let snapshotsByTarget: [OverviewCellTarget: [OverviewWindowSnapshot]] = Dictionary(grouping: snapshots, by: \.cellTarget)
 
-        return overviewCells.map { cell in
+        var result: [OverviewCellInfo] = []
+        for cell in overviewCells {
             let relX = cell.frame.topLeftX - monitorRect.topLeftX
             let relY = cell.frame.topLeftY - monitorRect.topLeftY
             let hudFrame = CGRect(x: relX, y: relY, width: cell.frame.width, height: cell.frame.height)
+            let windows = (snapshotsByTarget[cell.target] ?? []).map(\.window)
 
-            let appNames = (snapshotsByWorkspace[cell.workspaceName] ?? [])
-                .map { $0.window.app.name?.takeIf { !$0.isEmpty } }
-                .filterNotNil()
-                .toOrderedSet()
-                .elements
-
-            return OverviewCellInfo(
-                id: cell.workspaceName,
-                workspaceName: cell.workspaceName,
-                hudFrame: hudFrame,
-                label: formatCellLabel(workspaceName: cell.workspaceName, appNames: appNames, style: cellLabel),
-            )
+            let label: String
+            switch cell.target {
+                case .workspace(let workspaceName):
+                    let appNames = windows
+                        .map { $0.app.name?.takeIf { !$0.isEmpty } }
+                        .filterNotNil()
+                        .toOrderedSet()
+                        .elements
+                    label = formatCellLabel(workspaceName: workspaceName, appNames: appNames, style: config.overview.cellLabel)
+                case .window:
+                    let title = try await windows.first?.title ?? ""
+                    label = overviewWindowCellLabel(appName: windows.first?.app.name, title: title)
+            }
+            result.append(OverviewCellInfo(target: cell.target, hudFrame: hudFrame, label: label))
         }
+        return result
     }
 
     private func formatCellLabel(workspaceName: String, appNames: [String], style: OverviewCellLabel) -> String {
@@ -402,5 +542,25 @@ import Common
                 let apps = appNames.prefix(3).joined(separator: ", ")
                 return apps.isEmpty ? workspaceName : "\(workspaceName): \(apps)"
         }
+    }
+}
+
+/// Label for a windows-mode cell: "App: Title". Either part is dropped when empty, and the
+/// title is dropped when it just repeats the app name.
+func overviewWindowCellLabel(appName: String?, title: String) -> String {
+    [appName, title]
+        .filterNotNil()
+        .filter { !$0.isEmpty }
+        .toOrderedSet()
+        .elements
+        .joined(separator: ": ")
+}
+
+extension Workspace {
+    /// Windows `overview --windows` shows for this workspace, in grid order: tiling windows
+    /// in tree (dfs) order, then floating windows. Leaves out windows macOS owns —
+    /// native-fullscreen and hidden-app windows — which can't be moved into a cell.
+    @MainActor var overviewGridWindows: [Window] {
+        rootTilingContainer.allLeafWindowsRecursive + children.filterIsInstance(of: Window.self)
     }
 }

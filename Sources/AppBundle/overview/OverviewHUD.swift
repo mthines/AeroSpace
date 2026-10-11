@@ -9,7 +9,7 @@ import Common
     private var hostingView: NSHostingView<OverviewHUDView>?
     private var eventMonitor: Any?
     private var columnCount: Int = 1
-    private var onCommit: ((String) -> Void)?
+    private var onCommit: ((OverviewCellTarget) -> Void)?
     private var onCancel: (() -> Void)?
     private var cells: [OverviewCellInfo] = []
 
@@ -23,15 +23,18 @@ import Common
         self.hasShadow = false
         // Click-through: cells are visual-only. Clicks pass to the windows beneath so
         // macOS click-to-focus works normally; AeroSpace's setFocus hook then calls
-        // syncSelectionToActiveWorkspace to keep the highlight in sync.
+        // syncSelection(to:) to keep the highlight in sync.
         self.ignoresMouseEvents = true
     }
 
+    /// `initialSelection` is the cell highlighted when the HUD appears — the cell holding
+    /// the current focus. Falls back to the first cell when nil or not in `cells`.
     func show(
         monitorFrame: Rect,
         cells: [OverviewCellInfo],
         columnCount: Int,
-        onCommit: @escaping @MainActor (String) -> Void,
+        initialSelection: OverviewCellTarget?,
+        onCommit: @escaping @MainActor (OverviewCellTarget) -> Void,
         onCancel: @escaping @MainActor () -> Void,
     ) {
         self.cells = cells
@@ -39,8 +42,7 @@ import Common
         self.onCancel = onCancel
         self.columnCount = max(1, columnCount)
 
-        let activeName = focus.workspace.name
-        let initialIdx = cells.firstIndex(where: { $0.workspaceName == activeName }) ?? 0
+        let initialIdx = cells.firstIndex(where: { $0.target == initialSelection }) ?? 0
         self.selectionState.index = initialIdx
 
         let view = OverviewHUDView(cells: cells, selection: selectionState)
@@ -114,15 +116,14 @@ import Common
 
     private func selectCurrent() {
         guard let cell = cells.getOrNil(atIndex: selectedIndex) else { return }
-        onCommit?(cell.workspaceName)
+        onCommit?(cell.target)
     }
 
-    /// Sync the highlight to the currently-active workspace. Called from setFocus while
-    /// the overview is open so external workspace switches keep the HUD selection in sync.
-    @MainActor func syncSelectionToActiveWorkspace() {
-        guard !cells.isEmpty else { return }
-        let activeName = focus.workspace.name
-        guard let idx = cells.firstIndex(where: { $0.workspaceName == activeName }) else { return }
+    /// Move the highlight to the cell for `target`. Called from setFocus while the overview
+    /// is open so external focus changes (workspace switches, focus commands, clicks) keep
+    /// the HUD selection in sync. No-op when no cell matches.
+    @MainActor func syncSelection(to target: OverviewCellTarget) {
+        guard let idx = cells.firstIndex(where: { $0.target == target }) else { return }
         if idx == selectionState.index { return }
         selectionState.index = idx
     }

@@ -223,6 +223,7 @@ on-mode-changed = []
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#overview
     # alt-grave = 'overview'
+    # alt-shift-grave = 'overview --windows'  # windows of the focused workspace
     # ctrl-alt-left = 'workspace prev'
     # ctrl-alt-right = 'workspace next'
     # ctrl-alt-up = 'workspace up'      # overview-only grid jump

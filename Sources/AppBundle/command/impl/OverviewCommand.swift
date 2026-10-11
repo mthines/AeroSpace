@@ -11,7 +11,8 @@ struct OverviewCommand: Command {
         } else if args.resume {
             try await OverviewManager.shared.resume()
         } else {
-            try await OverviewManager.shared.activate()
+            let mode: OverviewMode = args.windows ? .windows(workspaceName: focus.workspace.name) : .workspaces
+            try await OverviewManager.shared.activate(mode: mode)
         }
         return .succ
     }

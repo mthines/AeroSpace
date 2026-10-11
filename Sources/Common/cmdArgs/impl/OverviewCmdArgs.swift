@@ -6,12 +6,15 @@ public struct OverviewCmdArgs: CmdArgs {
         allowInConfig: true,
         help: overview_help_generated,
         flags: [
+            "--windows": trueBoolFlag(\.windows),
             "--suspend": trueBoolFlag(\.suspend),
             "--resume": trueBoolFlag(\.resume),
         ],
         posArgs: [],
     )
 
+    /// Show the focused workspace's windows (one cell per window) instead of workspaces.
+    public var windows: Bool = false
     public var suspend: Bool = false
     public var resume: Bool = false
 }
@@ -19,4 +22,5 @@ public struct OverviewCmdArgs: CmdArgs {
 func parseOverviewCmdArgs(_ args: StrArrSlice) -> ParsedCmd<OverviewCmdArgs> {
     parseSpecificCmdArgs(OverviewCmdArgs(rawArgs: args), args)
         .filter("--suspend and --resume are mutually exclusive") { !($0.suspend && $0.resume) }
+        .filter("--windows is incompatible with --suspend and --resume") { $0.windows.implies(!$0.suspend && !$0.resume) }
 }
