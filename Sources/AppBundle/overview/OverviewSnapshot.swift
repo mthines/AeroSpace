@@ -1,5 +1,4 @@
 import AppKit
-import Common
 
 struct OverviewWindowSnapshot {
     let window: MacWindow
