@@ -18,6 +18,9 @@ while test $# -gt 0; do
     esac
 done
 
+export XCODEGEN_SWIFT_LANGUAGE_VERSION=6.2
+sed -i '' "1s|.*|// swift-tools-version: ${XCODEGEN_SWIFT_LANGUAGE_VERSION}|" Package.swift
+
 if test $generate_cmd_help = 1; then
     # It takes 300ms for the script to complete
     ./script/generate-cmd-help.sh
@@ -58,5 +61,9 @@ if test $generate_xcodeproj = 1; then
     export XCODEGEN_AEROSPACE_VERSION=$build_version
     ./script/install-dep.sh --xcodegen
     cd xcode
+
+    # Use the same Swift toolchain in xcodebuild
+    XCODEGEN_TOOLCHAINS="$(plutil -extract CFBundleIdentifier raw "$(swiftly use --print-location)/Info.plist")"
+    export XCODEGEN_TOOLCHAINS
     ../.deps/xcodegen/xcodegen # https://github.com/yonaskolb/XcodeGen
 fi
