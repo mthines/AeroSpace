@@ -15,6 +15,7 @@ import Common
 
     private let selectionState = SelectionState()
     private var selectedIndex: Int { selectionState.index }
+    var selectedTarget: OverviewCellTarget? { cells.getOrNil(atIndex: selectedIndex)?.target }
 
     override private init() {
         super.init()
@@ -115,8 +116,8 @@ import Common
     }
 
     private func selectCurrent() {
-        guard let cell = cells.getOrNil(atIndex: selectedIndex) else { return }
-        onCommit?(cell.target)
+        guard let target = selectedTarget else { return }
+        onCommit?(target)
     }
 
     /// Move the highlight to the cell for `target`. Called from setFocus while the overview

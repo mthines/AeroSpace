@@ -359,6 +359,14 @@ import Common
         moveFullscreenToFocusedWindow()
     }
 
+    /// Windows mode: close the grid on the highlighted window, as Enter does. Returns false,
+    /// leaving the overview alone, when no windows-mode overview is open.
+    func closeWindowsModeOnSelection() async throws -> Bool {
+        guard isOverviewActive, !isClosing, case .windows = mode else { return false }
+        try await deactivate(select: OverviewHUD.shared.selectedTarget)
+        return true
+    }
+
     /// Windows mode: when the workspace was in AeroSpace fullscreen as the grid opened and a
     /// different tiling window of it is focused now (selected with Enter, clicked, or reached
     /// with a focus command), make that window the fullscreen one. Plain AeroSpace focus
