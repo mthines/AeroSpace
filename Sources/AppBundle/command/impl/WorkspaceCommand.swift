@@ -10,6 +10,19 @@ struct WorkspaceCommand: Command {
         guard let target = args.resolveTargetOrReportError(env, io) else { return .fail }
         let focusedWs = target.workspace
         let workspaceName: String
+        // The windows overview's cells are windows: relative and direction targets move
+        // between them, as they move between workspace cells in the workspaces overview.
+        if OverviewManager.shared.isWindowsModeOpen, let window = target.windowOrNil {
+            switch args.target.val {
+                case .relative(let nextPrev):
+                    return focusGridWindow(OverviewManager.shared.adjacentGridWindow(
+                        from: window.windowId, isNext: nextPrev == .next, wrapAround: args.wrapAround,
+                    ))
+                case .direction(let dir):
+                    return focusGridWindow(OverviewManager.shared.adjacentGridWindow(from: window.windowId, direction: dir))
+                case .direct: break
+            }
+        }
         switch args.target.val {
             case .relative(let nextPrev):
                 let workspace = getNextPrevWorkspace(

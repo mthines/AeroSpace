@@ -22,6 +22,19 @@ struct FocusCommand: Command {
             }
         }
 
+        // The windows overview lays windows out in a grid: follow the grid, not the tree.
+        if OverviewManager.shared.isWindowsModeOpen, let window = target.windowOrNil {
+            let direction: CardinalDirection? = switch args.target {
+                case .direction(let direction): direction
+                case .dfsRelative(.dfsNext): .down
+                case .dfsRelative(.dfsPrev): .up
+                case .windowId, .dfsIndex: nil
+            }
+            if let direction {
+                return focusGridWindow(OverviewManager.shared.adjacentGridWindow(from: window.windowId, direction: direction))
+            }
+        }
+
         switch args.target {
             case .direction(let direction):
                 let window = target.windowOrNil

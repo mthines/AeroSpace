@@ -50,6 +50,34 @@ final class OverviewCommandTest: XCTestCase {
         assertEquals(workspace.overviewGridWindows.map(\.windowId), [1, 2, 3, 4])
     }
 
+    func testGridNeighborIn2x2() {
+        // 0 1
+        // 2 3
+        let n = { overviewGridNeighbor(of: $0, count: 4, columns: 2, direction: $1) }
+        assertEquals(n(0, .right), 1)
+        assertEquals(n(0, .down), 2)
+        assertEquals(n(1, .down), 3)
+        assertEquals(n(2, .right), 3)
+        assertEquals(n(3, .up), 1)
+        assertEquals(n(3, .left), 2)
+        // Edges stay put instead of wrapping into another row
+        assertEquals(n(1, .right), nil)
+        assertEquals(n(2, .left), nil)
+        assertEquals(n(0, .up), nil)
+        assertEquals(n(2, .down), nil)
+    }
+
+    func testGridNeighborWithShorterLastRow() {
+        // 0 1 2
+        // 3 4
+        let n = { overviewGridNeighbor(of: $0, count: 5, columns: 3, direction: $1) }
+        assertEquals(n(2, .down), 4) // no cell below: land on the last row's last cell
+        assertEquals(n(1, .down), 4)
+        assertEquals(n(4, .right), nil)
+        assertEquals(n(4, .up), 1)
+        assertEquals(n(3, .down), nil)
+    }
+
     func testWindowCellLabel() {
         assertEquals(overviewWindowCellLabel(appName: "Safari", title: "Apple"), "Safari: Apple")
         assertEquals(overviewWindowCellLabel(appName: "Finder", title: "Finder"), "Finder")

@@ -20,6 +20,10 @@ import Common
     /// switching windows from the grid keeps the workspace in fullscreen.
     private var fullscreenWindowAtOpen: (windowId: UInt32, noOuterGaps: Bool)?
 
+    /// The grid as last laid out: cell targets in row-major order and the column count.
+    private var gridTargets: [OverviewCellTarget] = []
+    private var gridColumns: Int = 1
+
     /// Monitor the overview is anchored to, identified by `rect.topLeftCorner` so it
     /// survives display reconfiguration. Captured on activate; the grid, HUD, and dim
     /// panel are scoped to this monitor. nil while the overview is closed.
@@ -88,6 +92,37 @@ import Common
         let target = idx + delta
         guard workspaces.indices.contains(target) else { return nil }
         return workspaces[target]
+    }
+
+    /// True while `overview --windows` is open and not closing.
+    var isWindowsModeOpen: Bool {
+        guard isOverviewActive, !isClosing, case .windows = mode else { return false }
+        return true
+    }
+
+    /// Windows mode: the window in the grid cell next to `windowId`'s, in `direction`.
+    /// nil at the grid edge, or when no windows-mode overview is open.
+    func adjacentGridWindow(from windowId: UInt32, direction: CardinalDirection) -> Window? {
+        gridWindow(from: windowId) { overviewGridNeighbor(of: $0, count: gridTargets.count, columns: gridColumns, direction: direction) }
+    }
+
+    /// Windows mode: the window in the previous or next cell, in grid (reading) order.
+    func adjacentGridWindow(from windowId: UInt32, isNext: Bool, wrapAround: Bool) -> Window? {
+        gridWindow(from: windowId) { index in
+            let count = gridTargets.count
+            let next = index + (isNext ? 1 : -1)
+            if (0 ..< count).contains(next) { return next }
+            return wrapAround ? (next + count) % count : nil
+        }
+    }
+
+    private func gridWindow(from windowId: UInt32, step: (Int) -> Int?) -> Window? {
+        guard isWindowsModeOpen,
+              let index = gridTargets.firstIndex(of: .window(windowId)),
+              let nextIndex = step(index),
+              case .window(let nextId) = gridTargets[nextIndex]
+        else { return nil }
+        return Window.get(byId: nextId)
     }
 
     /// Open the overview in `newMode`. While any overview is open, this closes it instead,
@@ -260,6 +295,8 @@ import Common
         let monitorRect = anchor.visibleRect
         let (overviewCells, columns) = computeOverviewCells(for: contents.map(\.target), monitorRect: monitorRect)
         let cellByTarget: [OverviewCellTarget: OverviewCell] = Dictionary(uniqueKeysWithValues: overviewCells.map { ($0.target, $0) })
+        gridTargets = overviewCells.map(\.target)
+        gridColumns = columns
 
         // Move windows into their cell slots (blocking so the HUD doesn't reveal before
         // the move). For tiling windows, use the freshly-computed lastAppliedLayoutPhysicalRect
@@ -321,6 +358,7 @@ import Common
             fullscreenWindowAtOpen = nil
             snapshots = []
             snapshotIds = []
+            gridTargets = []
             anchorMonitorCorner = nil
             scheduleCancellableCompleteRefreshSession(.hotkeyBinding)
         }
@@ -441,6 +479,7 @@ import Common
         anchorMonitorCorner = nil
         mode = .workspaces
         fullscreenWindowAtOpen = nil
+        gridTargets = []
     }
 
     private func resolveAnchorMonitor() -> MonitorInfo? {
@@ -562,6 +601,26 @@ func overviewWindowCellLabel(appName: String?, title: String) -> String {
         .toOrderedSet()
         .elements
         .joined(separator: ": ")
+}
+
+/// Focus a grid neighbor found by `adjacentGridWindow`; at the grid edge (nil), stay put.
+@MainActor func focusGridWindow(_ window: Window?) -> BinaryExitCode {
+    window.map { .from(bool: $0.focusWindow()) } ?? .succ
+}
+
+/// Index of the cell next to `index` in a row-major grid of `count` cells, or nil past an
+/// edge. Moving down into a shorter last row lands on that row's last cell.
+func overviewGridNeighbor(of index: Int, count: Int, columns: Int, direction: CardinalDirection) -> Int? {
+    guard (0 ..< count).contains(index), columns > 0 else { return nil }
+    let col = index % columns
+    switch direction {
+        case .left: return col > 0 ? index - 1 : nil
+        case .right: return col < columns - 1 && index + 1 < count ? index + 1 : nil
+        case .up: return index >= columns ? index - columns : nil
+        case .down:
+            let nextRowStart = (index / columns + 1) * columns
+            return nextRowStart < count ? min(index + columns, count - 1) : nil
+    }
 }
 
 extension Workspace {
